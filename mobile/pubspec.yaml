@@ -1,0 +1,45 @@
+name: labtrack
+description: "LabTrack - gestion des équipements de laboratoire de l'IMSP"
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.13.7
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:       # textes système (copier/coller, calendrier) en français
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  flutter_riverpod: ^3.5.0     # gestion d'état
+  go_router: ^18.1.3           # navigation
+  dio: ^5.11.1                 # appels HTTP vers l'API Django
+  flutter_secure_storage: ^11.2.0  # jetons JWT chiffrés sur le téléphone
+  shared_preferences: ^2.5.6   # préférences (adresse du serveur, thème)
+  mobile_scanner: ^7.5.0       # scan Code 128 via la caméra (ML Kit)
+  intl: ^0.20.3                # dates en français
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  # Police intégrée à l'app : elle s'affiche même sans Internet (démo en réseau local).
+  fonts:
+    - family: Jakarta
+      fonts:
+        - asset: assets/fonts/PlusJakartaSans-400.ttf
+          weight: 400
+        - asset: assets/fonts/PlusJakartaSans-500.ttf
+          weight: 500
+        - asset: assets/fonts/PlusJakartaSans-600.ttf
+          weight: 600
+        - asset: assets/fonts/PlusJakartaSans-700.ttf
+          weight: 700
+        - asset: assets/fonts/PlusJakartaSans-800.ttf
+          weight: 800

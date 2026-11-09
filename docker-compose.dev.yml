@@ -1,0 +1,12 @@
+# Surcharge de développement : le code du dossier backend/ est monté dans le conteneur
+# et gunicorn recharge à chaque modification.
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+services:
+  web:
+    environment:
+      DJANGO_DEBUG: "True"
+    volumes:
+      - ./backend:/app
+      - static:/app/staticfiles
+      - media:/app/media
+    command: ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--reload", "--timeout", "60"]
