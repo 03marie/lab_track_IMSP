@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -56,6 +57,28 @@ class AuthController extends AsyncNotifier<Utilisateur?> {
       rethrow;
     }
     state = AsyncData(await _chargerProfil());
+  }
+
+  /// Met à jour ses coordonnées et/ou sa photo de profil (envoi multipart au serveur).
+  Future<void> modifierProfil({String? email, String? telephone, File? photo}) async {
+    final donnees = FormData.fromMap({
+      'email': ?email?.trim(),
+      'telephone': ?telephone?.trim(),
+      if (photo != null)
+        'photo': await MultipartFile.fromFile(photo.path, filename: 'profil_${DateTime.now().millisecondsSinceEpoch}.jpg'),
+    });
+    final r = await ref.read(dioProvider).patch<Map<String, dynamic>>('auth/moi/', data: donnees);
+    await _memoriser(Utilisateur.fromJson(r.data!));
+  }
+
+  Future<void> supprimerPhoto() async {
+    final r = await ref.read(dioProvider).delete<Map<String, dynamic>>('auth/moi/photo/');
+    await _memoriser(Utilisateur.fromJson(r.data!));
+  }
+
+  Future<void> _memoriser(Utilisateur u) async {
+    await ref.read(prefsProvider).setString(_cleProfil, jsonEncode(u.toJson()));
+    state = AsyncData(u);
   }
 
   Future<void> fermerSession() async {

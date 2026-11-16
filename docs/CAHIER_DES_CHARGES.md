@@ -42,8 +42,11 @@ basée sur la lecture de codes-barres (Code 128) par la caméra du téléphone.
 - **Base** : PostgreSQL, **uniquement dans Docker** (aucune base ni dépendance serveur installée sur le PC hôte).
   Développement, tests et démo passent tous par `docker compose`.
 - **Mobile** : Flutter 3.x, `mobile_scanner`, `dio` (HTTP), Riverpod 3 (état), go_router, stockage sécurisé du jeton.
-- **Identité visuelle** : « Nuit d'encre & Aurore » — fond encre, dégradé signature iris → aqua, touches d'or ;
-  police Plus Jakarta Sans intégrée ; thèmes sombre (par défaut) et clair.
+- **Identité visuelle** : sobre et institutionnelle — aplats (ni dégradés, ni halos, ni effet verre), un seul bleu
+  d'accent, couleurs de statut atténuées, filets de couleur sur les cartes (catégorie, laboratoire, statut) ;
+  barre de navigation opaque posée sous le contenu ; police Plus Jakarta Sans intégrée ; thèmes sombre (par défaut) et clair.
+- **Affichage** : toute feuille du bas s'ouvre via `ouvrirFeuille` (au-dessus de la barre de navigation et des boutons
+  système du téléphone) ; des tests automatiques empêchent qu'un bouton passe sous l'une ou l'autre.
 - **Réseau démo** : Django lancé sur `0.0.0.0:8000`, téléphone et PC sur le même Wi-Fi,
   l'app pointe vers l'IP du PC (HTTP clair autorisé sur le réseau local pour la démo).
 
@@ -88,6 +91,19 @@ ou `retiré` ne peut pas être emprunté ; chaque changement de statut crée un 
 - Image Code 128 par équipement (PNG) ; **planche d'étiquettes PDF** (plusieurs par feuille A4) ;
   réimpression d'une étiquette sans créer un nouvel équipement.
 - **Recherche par scan** : `GET /equipements/par-code/<code>/` → fiche complète + statut + emprunt en cours.
+
+### F2 bis — Gestion depuis le mobile (v1.1)
+- **Laboratoires** : créer (administrateur) et supprimer ; suppression refusée tant qu'il contient des équipements (message du serveur).
+- **Équipements** : créer (formulaire complet : nom, catégorie, laboratoire, emplacement, marque, modèle, n° de série,
+  date d'acquisition, photo, description), modifier, supprimer.
+  - **Règle de suppression sûre** : définitive seulement si l'équipement n'a jamais servi (aucun emprunt, panne,
+    inventaire ni retrait) ; sinon il est **retiré du parc** (motif obligatoire) : masqué des listes, historique conservé.
+  - Les équipements retirés n'apparaissent que si on filtre sur « Retiré ».
+- **Étiquettes** : après création, aperçu du code-barres Code 128 et **PDF A4** (3 × 8 étiquettes) à imprimer ou partager ;
+  réglage « feuille déjà entamée » ; impression d'une étiquette depuis une fiche, ou de tout un laboratoire.
+- **Profil** : informations du compte, photo de profil (caméra ou galerie), modification de l'e-mail et du téléphone.
+- **Droits** : l'administrateur gère tout ; le responsable gère les équipements de ses laboratoires ; le technicien consulte.
+- **Mise à jour de l'APK sans désinstaller** : numéro de version croissant automatique + même clé de signature.
 
 ### F3 — Emprunts et retours
 - Créer un emprunt (scan équipement + choix emprunteur + date de retour prévue).
@@ -141,6 +157,7 @@ Les **alertes de retard** simples (calcul serveur) sont incluses en v1.
 ### Phase B — Mobile Flutter (semaines 2 à 3)
 - [x] B1. Projet Flutter, client API (JWT + renouvellement auto), connexion, configuration du serveur, système de design
 - [x] B2. Écran de scan (Code 128) + fiche équipement + liste avec recherche/filtres — *à tester sur téléphone réel*
+- [x] B2b. Gestion mobile : laboratoires, équipements (créer/modifier/supprimer/retirer), étiquettes PDF A4, profil avec photo
 - [ ] B3. Emprunts et retours
 - [ ] B4. Inventaire par scan
 - [ ] B5. Pannes avec photo

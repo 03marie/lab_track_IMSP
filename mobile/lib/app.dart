@@ -8,8 +8,12 @@ import 'core/theme/app_theme.dart';
 import 'features/auth/auth_controller.dart';
 import 'features/auth/connexion_screen.dart';
 import 'features/dashboard/dashboard_screen.dart';
+import 'core/api/modeles.dart';
 import 'features/equipements/detail_screen.dart';
+import 'features/equipements/equipement_form_screen.dart';
+import 'features/equipements/equipements_repository.dart';
 import 'features/equipements/equipements_screen.dart';
+import 'features/equipements/etiquettes_screen.dart';
 import 'features/laboratoires/laboratoires_screen.dart';
 import 'features/profil/profil_screen.dart';
 import 'features/scan/scan_screen.dart';
@@ -80,9 +84,34 @@ final routerProvider = Provider<GoRouter>((ref) {
           },
         ),
       ),
+      // « nouveau » doit être déclaré AVANT « :id », sinon « nouveau » serait pris pour un identifiant.
+      GoRoute(
+        path: '/equipement/nouveau',
+        builder: (_, state) => EquipementFormScreen(laboInitial: int.tryParse(state.uri.queryParameters['labo'] ?? '')),
+      ),
       GoRoute(
         path: '/equipement/:id',
         builder: (_, state) => DetailEquipementScreen(id: int.parse(state.pathParameters['id']!)),
+        routes: [
+          GoRoute(
+            path: 'modifier',
+            builder: (_, state) {
+              final id = int.parse(state.pathParameters['id']!);
+              // La fiche est passée en paramètre depuis la page de détail ; sinon on la recharge.
+              final fournie = state.extra;
+              if (fournie is Equipement) return EquipementFormScreen(existant: fournie);
+              return _ChargerPuisModifier(id: id);
+            },
+          ),
+        ],
+      ),
+      GoRoute(
+        path: '/etiquettes',
+        builder: (_, state) => EtiquettesScreen(
+          ids: state.uri.queryParameters['ids'] ?? '',
+          laboratoire: int.tryParse(state.uri.queryParameters['labo'] ?? ''),
+          titre: state.uri.queryParameters['titre'],
+        ),
       ),
       GoRoute(
         path: '/laboratoire/:id',
@@ -112,6 +141,22 @@ class LabTrackApp extends ConsumerWidget {
       locale: const Locale('fr', 'FR'),
       supportedLocales: const [Locale('fr', 'FR')],
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
+    );
+  }
+}
+
+/// Ouverture du formulaire de modification sans fiche fournie (lien direct) : on charge d'abord l'équipement.
+class _ChargerPuisModifier extends ConsumerWidget {
+  const _ChargerPuisModifier({required this.id});
+  final int id;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final e = ref.watch(equipementProvider(id));
+    return e.when(
+      data: (equipement) => EquipementFormScreen(existant: equipement),
+      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
+      error: (_, _) => const Scaffold(body: Center(child: Text('Équipement introuvable'))),
     );
   }
 }

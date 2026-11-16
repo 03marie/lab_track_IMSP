@@ -7,11 +7,12 @@ import '../../core/api/modeles.dart';
 import '../../core/format.dart';
 import '../../core/theme/palette.dart';
 import '../../core/theme/semantique.dart';
-import '../../core/widgets/aurora.dart';
+import '../../core/widgets/avatar.dart';
 import '../../core/widgets/composants.dart';
 import '../auth/auth_controller.dart';
 import '../equipements/equipements_repository.dart';
 import '../equipements/widgets.dart';
+import '../laboratoires/labo_card.dart';
 
 class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
@@ -31,122 +32,146 @@ class DashboardScreen extends ConsumerWidget {
     final labos = ref.watch(laboratoiresProvider);
 
     return Scaffold(
-      body: AuroraBackground(
-        intensite: .55,
-        child: RefreshIndicator(
-          onRefresh: () => _rafraichir(ref),
-          edgeOffset: MediaQuery.paddingOf(context).top,
-          child: CustomScrollView(
-            physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
-            slivers: [
-              SliverSafeArea(
-                bottom: false,
-                sliver: SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                  sliver: SliverToBoxAdapter(
-                    child: Entree(child: _EnTete(utilisateur: utilisateur)),
-                  ),
+      body: RefreshIndicator(
+        onRefresh: () => _rafraichir(ref),
+        edgeOffset: MediaQuery.paddingOf(context).top,
+        child: CustomScrollView(
+          physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+          slivers: [
+            SliverSafeArea(
+              bottom: false,
+              sliver: SliverPadding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                sliver: SliverToBoxAdapter(
+                  child: Entree(child: _EnTete(utilisateur: utilisateur)),
                 ),
               ),
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-                sliver: SliverToBoxAdapter(
-                  child: Entree(
-                    index: 1,
-                    child: stats.when(
-                      data: (s) => _CarteHeros(stats: s),
-                      loading: () => const Skeleton(height: 228, radius: 32),
-                      error: (e, _) => SurfaceCard(
-                        child: EtatVide(
-                          icone: Icons.cloud_off_rounded,
-                          titre: 'Impossible de joindre le serveur',
-                          message: messageErreur(e),
-                          action: 'Réessayer',
-                          couleur: Palette.rose,
-                          onAction: () => ref.invalidate(statistiquesProvider),
-                        ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 22, 20, 0),
+              sliver: SliverToBoxAdapter(
+                child: Entree(
+                  index: 1,
+                  child: stats.when(
+                    data: (s) => _CarteResume(stats: s),
+                    loading: () => const Skeleton(height: 188, radius: 16),
+                    error: (e, _) => SurfaceCard(
+                      child: EtatVide(
+                        icone: Icons.cloud_off_rounded,
+                        titre: 'Impossible de joindre le serveur',
+                        message: messageErreur(e),
+                        action: 'Réessayer',
+                        couleur: Palette.rose,
+                        onAction: () => ref.invalidate(statistiquesProvider),
                       ),
                     ),
                   ),
                 ),
               ),
-              if (stats.hasValue)
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                  sliver: SliverGrid.count(
-                    crossAxisCount: 2,
-                    mainAxisSpacing: 12,
-                    crossAxisSpacing: 12,
-                    childAspectRatio: 1.38,
-                    children: [
-                      for (final (i, s) in statuts.entries.indexed)
-                        Entree(
-                          index: 2 + i,
-                          child: _TuileStatut(cle: s.key, apparence: s.value, valeur: stats.value![s.key]),
-                        ),
-                    ],
-                  ),
-                ),
+            ),
+            if (stats.hasValue)
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 30, 20, 14),
-                sliver: SliverToBoxAdapter(
-                  child: TitreSection('Laboratoires', action: 'Tout voir', onAction: () => context.go('/laboratoires')),
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                sliver: SliverGrid.count(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: 1.55,
+                  children: [
+                    for (final (i, s) in statuts.entries.indexed)
+                      Entree(
+                        index: 2 + i,
+                        child: _TuileStatut(cle: s.key, apparence: s.value, valeur: stats.value![s.key]),
+                      ),
+                  ],
                 ),
               ),
-              SliverToBoxAdapter(
-                child: SizedBox(
-                  height: 132,
-                  child: labos.when(
-                    data: (liste) => ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      physics: const BouncingScrollPhysics(),
-                      itemCount: liste.length,
-                      separatorBuilder: (_, _) => const SizedBox(width: 12),
-                      itemBuilder: (_, i) => Entree(index: i, decalage: const Offset(30, 0), child: _CarteLaboMini(liste[i])),
-                    ),
-                    loading: () => ListView(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      children: const [
-                        Skeleton(width: 200, height: 132, radius: 26),
-                        SizedBox(width: 12),
-                        Skeleton(width: 200, height: 132, radius: 26),
-                      ],
-                    ),
-                    error: (_, _) => const SizedBox.shrink(),
-                  ),
-                ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 28, 20, 12),
+              sliver: SliverToBoxAdapter(
+                child: TitreSection('Laboratoires', action: 'Tout voir', onAction: () => context.go('/laboratoires')),
               ),
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(20, 30, 20, 14),
-                sliver: SliverToBoxAdapter(
-                  child: TitreSection('Ajoutés récemment', action: 'Inventaire', onAction: () => context.go('/equipements')),
-                ),
+            ),
+            SliverToBoxAdapter(
+              child: _RangeeHorizontale<Laboratoire>(
+                valeur: labos,
+                hauteur: 160,
+                largeur: 176,
+                vide: 'Aucun laboratoire pour l\'instant.',
+                carte: (l) => LaboCard(l, compact: true),
               ),
-              recents.when(
-                data: (liste) => SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  sliver: SliverList.separated(
-                    itemCount: liste.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 10),
-                    itemBuilder: (_, i) => Entree(index: i, child: EquipementTile(liste[i])),
-                  ),
-                ),
-                loading: () => SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  sliver: SliverList.separated(
-                    itemCount: 3,
-                    separatorBuilder: (_, _) => const SizedBox(height: 10),
-                    itemBuilder: (_, _) => const EquipementTileSkeleton(),
-                  ),
-                ),
-                error: (_, _) => const SliverToBoxAdapter(),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+              sliver: SliverToBoxAdapter(
+                child: TitreSection('Ajoutés récemment', action: 'Tout voir', onAction: () => context.go('/equipements')),
               ),
-              const SliverToBoxAdapter(child: SizedBox(height: 140)),
-            ],
-          ),
+            ),
+            SliverToBoxAdapter(
+              child: _RangeeHorizontale<Equipement>(
+                valeur: recents,
+                hauteur: 176,
+                largeur: 168,
+                vide: 'Aucun équipement enregistré pour l\'instant.',
+                carte: EquipementCard.new,
+              ),
+            ),
+            SliverToBoxAdapter(child: SizedBox(height: MediaQuery.paddingOf(context).bottom + 24)),
+          ],
         ),
+      ),
+    );
+  }
+}
+
+/// Liste horizontale de cartes, avec états de chargement et de liste vide.
+class _RangeeHorizontale<T> extends StatelessWidget {
+  const _RangeeHorizontale({
+    required this.valeur,
+    required this.hauteur,
+    required this.largeur,
+    required this.vide,
+    required this.carte,
+  });
+
+  final AsyncValue<List<T>> valeur;
+  final double hauteur;
+  final double largeur;
+  final String vide;
+  final Widget Function(T) carte;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: hauteur,
+      child: valeur.when(
+        data: (liste) => liste.isEmpty
+            ? Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Text(vide, style: context.text.bodySmall),
+              )
+            : ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                physics: const BouncingScrollPhysics(),
+                itemCount: liste.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 12),
+                itemBuilder: (_, i) => Entree(
+                  index: i,
+                  decalage: const Offset(16, 0),
+                  child: SizedBox(width: largeur, child: carte(liste[i])),
+                ),
+              ),
+        loading: () => ListView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          children: [
+            Skeleton(width: largeur, height: hauteur, radius: 16),
+            const SizedBox(width: 12),
+            Skeleton(width: largeur, height: hauteur, radius: 16),
+          ],
+        ),
+        error: (_, _) => const SizedBox.shrink(),
       ),
     );
   }
@@ -161,26 +186,13 @@ class _EnTete extends StatelessWidget {
     final u = utilisateur;
     return Row(
       children: [
-        Pressable(
-          onTap: () => context.go('/profil'),
-          child: Container(
-            width: 52,
-            height: 52,
-            padding: const EdgeInsets.all(2.5),
-            decoration: const BoxDecoration(shape: BoxShape.circle, gradient: Palette.signature),
-            child: Container(
-              decoration: BoxDecoration(shape: BoxShape.circle, color: context.lab.surface),
-              alignment: Alignment.center,
-              child: GradientText(u?.initiales ?? '?', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
-            ),
-          ),
-        ),
+        Pressable(onTap: () => context.go('/profil'), child: AvatarUtilisateur(u, taille: 48)),
         const SizedBox(width: 14),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('${salutation()},', style: context.text.bodyMedium?.copyWith(color: context.lab.textMuted)),
+              Text('${salutation()},', style: context.text.bodySmall),
               Text(
                 u?.prenom.isNotEmpty == true ? u!.prenom : (u?.nomComplet ?? ''),
                 maxLines: 1,
@@ -190,167 +202,66 @@ class _EnTete extends StatelessWidget {
             ],
           ),
         ),
-        if (u != null)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-            decoration: BoxDecoration(
-              color: context.or.withValues(alpha: .12),
-              borderRadius: BorderRadius.circular(99),
-              border: Border.all(color: context.or.withValues(alpha: .35)),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.workspace_premium_rounded, size: 15, color: context.or),
-                const SizedBox(width: 6),
-                Text(
-                  u.roleLibelle.split(' ').first,
-                  style: TextStyle(color: context.or, fontWeight: FontWeight.w700, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
+        if (u != null) Text(u.roleLibelle.split(' ').first, style: context.text.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
       ],
     );
   }
 }
 
-class _CarteHeros extends StatelessWidget {
-  const _CarteHeros({required this.stats});
+/// Carte de synthèse : total du parc, taux de disponibilité, répartition et accès rapide au scan.
+class _CarteResume extends StatelessWidget {
+  const _CarteResume({required this.stats});
   final Statistiques stats;
 
   @override
   Widget build(BuildContext context) {
     final dispo = stats['disponible'];
     final taux = stats.total == 0 ? 0 : (dispo * 100 / stats.total).round();
-    return Container(
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        gradient: Palette.signatureSoft,
-        borderRadius: BorderRadius.circular(32),
-        boxShadow: [
-          BoxShadow(color: Palette.iris.withValues(alpha: .45), blurRadius: 40, offset: const Offset(0, 18), spreadRadius: -14),
-        ],
-      ),
-      child: Stack(
+    return SurfaceCard(
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Décor : grands cercles translucides
-          Positioned(right: -60, top: -70, child: _Cercle(220, .12)),
-          Positioned(left: -40, bottom: -90, child: _Cercle(200, .08)),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(24, 24, 20, 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          Row(
+            children: [
+              Expanded(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'PARC D\'ÉQUIPEMENTS',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: .75),
-                              fontWeight: FontWeight.w700,
-                              fontSize: 11.5,
-                              letterSpacing: 1.6,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          CompteurAnime(
-                            stats.total,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 56,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -2,
-                              height: 1.05,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '$dispo disponibles · $taux % du parc',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: .85),
-                              fontWeight: FontWeight.w600,
-                              fontSize: 13.5,
-                            ),
-                          ),
-                        ],
+                    Text(
+                      'PARC D\'ÉQUIPEMENTS',
+                      style: TextStyle(
+                        color: context.lab.textMuted,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 11.5,
+                        letterSpacing: 1.1,
                       ),
                     ),
-                    AnneauStatuts(
-                      stats: stats,
-                      taille: 104,
-                      epaisseur: 11,
-                      centre: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            '$taux%',
-                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 20),
-                          ),
-                          Text(
-                            'dispo.',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: .75),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                    const SizedBox(height: 4),
+                    CompteurAnime(stats.total, style: context.text.displaySmall?.copyWith(fontSize: 44, height: 1.1)),
+                    const SizedBox(height: 2),
+                    Text('$dispo disponible${dispo > 1 ? 's' : ''} sur ${stats.total}', style: context.text.bodySmall),
                   ],
                 ),
-                const SizedBox(height: 20),
-                Pressable(
-                  onTap: () => context.push('/scanner'),
-                  child: Container(
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: .18),
-                      borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: Colors.white.withValues(alpha: .3)),
-                    ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.qr_code_scanner_rounded, color: Colors.white, size: 22),
-                        SizedBox(width: 10),
-                        Text(
-                          'Scanner un équipement',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+              AnneauStatuts(
+                stats: stats,
+                taille: 92,
+                epaisseur: 9,
+                centre: Text('$taux %', style: context.text.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          BoutonPrincipal(
+            label: 'Scanner un équipement',
+            icone: Icons.qr_code_scanner_rounded,
+            onPressed: () => context.push('/scanner'),
           ),
         ],
       ),
     );
   }
-}
-
-class _Cercle extends StatelessWidget {
-  const _Cercle(this.taille, this.opacite);
-  final double taille;
-  final double opacite;
-
-  @override
-  Widget build(BuildContext context) => Container(
-    width: taille,
-    height: taille,
-    decoration: BoxDecoration(
-      shape: BoxShape.circle,
-      border: Border.all(color: Colors.white.withValues(alpha: opacite), width: 26),
-    ),
-  );
 }
 
 class _TuileStatut extends StatelessWidget {
@@ -363,70 +274,23 @@ class _TuileStatut extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final c = apparence.couleur;
+    final libelle = libelleStatutCompte(cle, valeur);
     return SurfaceCard(
-      padding: const EdgeInsets.all(16),
+      accent: c,
+      padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
       onTap: () => context.go('/equipements?statut=$cle'),
-      child: Stack(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Positioned(right: -6, top: -6, child: Icon(apparence.icone, size: 56, color: c.withValues(alpha: .08))),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(color: c.withValues(alpha: .15), borderRadius: BorderRadius.circular(11)),
-                child: Icon(apparence.icone, color: c, size: 19),
-              ),
-              const Spacer(),
-              CompteurAnime(valeur, style: context.text.headlineMedium?.copyWith(height: 1)),
-              const SizedBox(height: 2),
-              Text((n) {
-                final l = libelleStatutCompte(cle, n);
-                return l[0].toUpperCase() + l.substring(1);
-              }(valeur), style: context.text.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
-            ],
+          Icon(apparence.icone, color: context.lisible(c), size: 22),
+          const Spacer(),
+          CompteurAnime(valeur, style: context.text.headlineMedium?.copyWith(height: 1)),
+          const SizedBox(height: 2),
+          Text(
+            libelle[0].toUpperCase() + libelle.substring(1),
+            style: context.text.bodySmall?.copyWith(fontWeight: FontWeight.w500),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _CarteLaboMini extends StatelessWidget {
-  const _CarteLaboMini(this.labo);
-  final Laboratoire labo;
-
-  @override
-  Widget build(BuildContext context) {
-    final teintes = teintesLaboratoire(labo.code);
-    return SurfaceCard(
-      padding: const EdgeInsets.all(16),
-      radius: 26,
-      onTap: () => context.push('/laboratoire/${labo.id}', extra: labo.nom),
-      child: SizedBox(
-        width: 168,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                GradientIcon(icone: Icons.science_rounded, teintes: teintes, taille: 38, rayon: 12),
-                const Spacer(),
-                Text(labo.code, style: styleCode.copyWith(color: teintes.first, fontSize: 11.5)),
-              ],
-            ),
-            const Spacer(),
-            Text(
-              labo.nom,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: context.text.titleSmall?.copyWith(fontWeight: FontWeight.w700, height: 1.2),
-            ),
-            const SizedBox(height: 4),
-            Text('${labo.nbEquipements} équipements', style: context.text.bodySmall),
-          ],
-        ),
       ),
     );
   }

@@ -7,14 +7,35 @@ from .models import Utilisateur
 class UtilisateurSerializer(serializers.ModelSerializer):
     role_libelle = serializers.CharField(source="get_role_display", read_only=True)
     nom_complet = serializers.CharField(read_only=True)
+    # Identifiants des laboratoires dont l'utilisateur est responsable (l'app s'en sert pour
+    # ne proposer que ses laboratoires dans les formulaires).
+    laboratoires_geres = serializers.PrimaryKeyRelatedField(many=True, read_only=True)
+    photo = serializers.ImageField(read_only=True)
 
     class Meta:
         model = Utilisateur
         fields = [
             "id", "username", "first_name", "last_name", "nom_complet", "email",
-            "role", "role_libelle", "matricule", "telephone", "is_active",
+            "role", "role_libelle", "matricule", "telephone", "is_active", "laboratoires_geres", "photo",
         ]
         read_only_fields = ["id", "is_active"]
+
+
+TAILLE_MAX_PHOTO = 5 * 1024 * 1024  # 5 Mo
+
+
+class ProfilSerializer(serializers.ModelSerializer):
+    """Ce qu'un utilisateur peut modifier lui-même : coordonnées et photo.
+    Nom, rôle, identifiant et matricule restent gérés par l'administration."""
+
+    class Meta:
+        model = Utilisateur
+        fields = ["email", "telephone", "photo"]
+
+    def validate_photo(self, fichier):
+        if fichier and fichier.size > TAILLE_MAX_PHOTO:
+            raise serializers.ValidationError("La photo est trop lourde (5 Mo maximum).")
+        return fichier
 
 
 class UtilisateurCreationSerializer(UtilisateurSerializer):

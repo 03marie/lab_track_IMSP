@@ -1,5 +1,6 @@
 // Captures d'écran de l'app avec des données factices (revue visuelle du design).
 // Regénérer : flutter test --update-goldens apercus/   → images dans apercus/captures/
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -14,11 +15,26 @@ import 'package:labtrack/features/auth/auth_controller.dart';
 import 'package:labtrack/features/equipements/equipements_repository.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-const _u = Utilisateur(id: 2, username: 'resp.elec', prenom: 'Koffi', nom: 'Mensah', role: 'responsable', roleLibelle: 'Responsable de laboratoire');
+const _u = Utilisateur(
+  id: 2,
+  username: 'resp.elec',
+  prenom: 'Koffi',
+  nom: 'Mensah',
+  role: 'responsable',
+  roleLibelle: 'Responsable de laboratoire',
+  email: 'koffi.mensah@imsp.bj',
+  telephone: '+229 97 00 00 00',
+  matricule: 'R-0012',
+  laboratoiresGeres: [1],
+);
+
+const _admin = Utilisateur(id: 1, username: 'admin', prenom: 'Admin', nom: 'IMSP', role: 'admin', roleLibelle: 'Administrateur');
 
 class _AuthConnecte extends AuthController {
+  static Utilisateur courant = _u;
+
   @override
-  Future<Utilisateur?> build() async => _u;
+  Future<Utilisateur?> build() async => courant;
 }
 
 class _AuthDeconnecte extends AuthController {
@@ -26,30 +42,48 @@ class _AuthDeconnecte extends AuthController {
   Future<Utilisateur?> build() async => null;
 }
 
-Equipement _e(int id, String nom, String cat, String labo, String statut, {String empl = '', String marque = '', String modele = ''}) =>
-    Equipement(
-      id: id,
-      code: 'IMSP-EQ-${id.toString().padLeft(4, '0')}',
-      nom: nom,
-      categorieNom: cat,
-      laboratoireId: labo == 'Laboratoire d\'électronique' ? 1 : 2,
-      laboratoireNom: labo,
-      etat: statut == 'en_maintenance' ? 'defectueux' : 'bon',
-      statut: statut,
-      emplacement: empl,
-      marque: marque,
-      modele: modele,
-      numeroSerie: id == 3 ? 'DS1ZA2024' : '',
-      dateAcquisition: DateTime(2024, 3, 14),
-      creeLe: DateTime.now().subtract(Duration(days: id)),
-    );
+Equipement _e(
+  int id,
+  String nom,
+  String cat,
+  String labo,
+  String statut, {
+  String empl = '',
+  String marque = '',
+  String modele = '',
+}) => Equipement(
+  id: id,
+  code: 'IMSP-EQ-${id.toString().padLeft(4, '0')}',
+  nom: nom,
+  categorieId: cat.length,
+  categorieNom: cat,
+  laboratoireId: labo == 'Laboratoire d\'électronique' ? 1 : 2,
+  laboratoireNom: labo,
+  etat: statut == 'en_maintenance' ? 'defectueux' : 'bon',
+  statut: statut,
+  emplacement: empl,
+  marque: marque,
+  modele: modele,
+  numeroSerie: id == 3 ? 'DS1ZA2024' : '',
+  dateAcquisition: DateTime(2024, 3, 14),
+  creeLe: DateTime.now().subtract(Duration(days: id)),
+);
 
 const _elec = 'Laboratoire d\'électronique';
 const _info = 'Laboratoire d\'informatique';
 final _equipements = [
   _e(1, 'Multimètre numérique', 'Instruments de mesure', _elec, 'disponible', empl: 'Armoire A2', marque: 'Fluke', modele: '117'),
   _e(2, 'Multimètre numérique', 'Instruments de mesure', _elec, 'emprunte', empl: 'Armoire A2'),
-  _e(3, 'Oscilloscope 100 MHz', 'Instruments de mesure', _elec, 'disponible', empl: 'Paillasse 1', marque: 'Rigol', modele: 'DS1104'),
+  _e(
+    3,
+    'Oscilloscope 100 MHz',
+    'Instruments de mesure',
+    _elec,
+    'disponible',
+    empl: 'Paillasse 1',
+    marque: 'Rigol',
+    modele: 'DS1104',
+  ),
   _e(4, 'Alimentation stabilisée', 'Instruments de mesure', _elec, 'en_maintenance', empl: 'Paillasse 2'),
   _e(5, 'Arduino Uno', 'Cartes de développement', _elec, 'disponible', empl: 'Armoire A3'),
   _e(7, 'ESP32 DevKit', 'Cartes de développement', _elec, 'emprunte', empl: 'Armoire A3'),
@@ -62,10 +96,33 @@ const _labos = [
   Laboratoire(id: 2, code: 'INFO', nom: _info, localisation: 'Bâtiment A, salle 3', nbEquipements: 4),
 ];
 final _historique = [
-  Mouvement(id: 3, type: 'retour', auteur: 'Koffi Mensah', details: 'Rendu en bon état par Awa Diallo.', date: DateTime.now().subtract(const Duration(minutes: 42))),
-  Mouvement(id: 2, type: 'emprunt', auteur: 'Koffi Mensah', details: 'TP d\'électronique L2 — retour prévu demain.', date: DateTime.now().subtract(const Duration(days: 1, hours: 3))),
-  Mouvement(id: 1, type: 'creation', auteur: 'Admin IMSP', details: 'Enregistré dans Laboratoire d\'électronique.', date: DateTime(2026, 10, 2, 9, 30)),
+  Mouvement(
+    id: 3,
+    type: 'retour',
+    auteur: 'Koffi Mensah',
+    details: 'Rendu en bon état par Awa Diallo.',
+    date: DateTime.now().subtract(const Duration(minutes: 42)),
+  ),
+  Mouvement(
+    id: 2,
+    type: 'emprunt',
+    auteur: 'Koffi Mensah',
+    details: 'TP d\'électronique L2 — retour prévu demain.',
+    date: DateTime.now().subtract(const Duration(days: 1, hours: 3)),
+  ),
+  Mouvement(
+    id: 1,
+    type: 'creation',
+    auteur: 'Admin IMSP',
+    details: 'Enregistré dans Laboratoire d\'électronique.',
+    date: DateTime(2026, 10, 2, 9, 30),
+  ),
 ];
+
+// PNG 1×1 blanc : suffit pour vérifier la mise en page de l'aperçu du code-barres.
+final _pngBlanc = base64Decode(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+);
 
 Future<void> _polices() async {
   final jakarta = FontLoader('Jakarta');
@@ -74,8 +131,14 @@ Future<void> _polices() async {
   }
   await jakarta.load();
   final icones = FontLoader('MaterialIcons')
-    ..addFont(Future.value(ByteData.sublistView(
-        File('${Platform.environment['FLUTTER_ROOT']}/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf').readAsBytesSync())));
+    ..addFont(
+      Future.value(
+        ByteData.sublistView(
+          File('${Platform.environment['FLUTTER_ROOT']}/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf')
+              .readAsBytesSync(),
+        ),
+      ),
+    );
   await icones.load();
 }
 
@@ -85,10 +148,18 @@ void main() {
     await _polices();
   });
 
-  Future<ProviderContainer> monter(WidgetTester tester, {required bool connecte, ThemeMode theme = ThemeMode.dark}) async {
+  Future<ProviderContainer> monter(
+    WidgetTester tester, {
+    required bool connecte,
+    ThemeMode theme = ThemeMode.dark,
+    bool admin = false,
+  }) async {
+    _AuthConnecte.courant = admin ? _admin : _u;
     tester.view.physicalSize = const Size(1179, 2556);
     tester.view.devicePixelRatio = 3;
     tester.view.padding = const FakeViewPadding(top: 141, bottom: 102);
+    tester.view.viewPadding = const FakeViewPadding(top: 141, bottom: 102);
+    // ignore: invalid_use_of_visible_for_testing_member
     SharedPreferences.setMockInitialValues({'serveur': 'http://192.168.1.20:8000', 'theme': theme.name});
     final prefs = await SharedPreferences.getInstance();
     final container = ProviderContainer(
@@ -96,11 +167,13 @@ void main() {
       overrides: [
         prefsProvider.overrideWithValue(prefs),
         authProvider.overrideWith(connecte ? _AuthConnecte.new : _AuthDeconnecte.new),
-        statistiquesProvider.overrideWith((ref, labo) async => labo == null
-            ? _stats
-            : labo == 1
-                ? const Statistiques(total: 9, parStatut: {'disponible': 5, 'emprunte': 2, 'en_maintenance': 1, 'retire': 1})
-                : const Statistiques(total: 4, parStatut: {'disponible': 3, 'emprunte': 1})),
+        statistiquesProvider.overrideWith(
+          (ref, labo) async => labo == null
+              ? _stats
+              : labo == 1
+              ? const Statistiques(total: 9, parStatut: {'disponible': 5, 'emprunte': 2, 'en_maintenance': 1, 'retire': 1})
+              : const Statistiques(total: 4, parStatut: {'disponible': 3, 'emprunte': 1}),
+        ),
         recentsProvider.overrideWith((ref) async => _equipements.reversed.take(4).toList()),
         laboratoiresProvider.overrideWith((ref) async => _labos),
         pageEquipementsProvider.overrideWith((ref, args) async {
@@ -110,6 +183,17 @@ void main() {
         }),
         equipementProvider.overrideWith((ref, id) async => _equipements.firstWhere((e) => e.id == id)),
         historiqueProvider.overrideWith((ref, id) async => _historique),
+        categoriesProvider.overrideWith(
+          (ref) async => const [
+            Categorie(id: 22, nom: 'Instruments de mesure'),
+            Categorie(id: 23, nom: 'Cartes de développement'),
+            Categorie(id: 10, nom: 'Ordinateurs'),
+            Categorie(id: 6, nom: 'Optique'),
+            Categorie(id: 8, nom: 'Verrerie'),
+          ],
+        ),
+        responsablesProvider.overrideWith((ref) async => const [_u]),
+        codeBarresProvider.overrideWith((ref, id) async => _pngBlanc),
       ],
     );
     await tester.pumpWidget(UncontrolledProviderScope(container: container, child: const LabTrackApp()));
@@ -166,5 +250,55 @@ void main() {
   testWidgets('accueil clair', (tester) async {
     await monter(tester, connecte: true, theme: ThemeMode.light);
     await capture(tester, '7-accueil-clair');
+  });
+
+  testWidgets('formulaire equipement', (tester) async {
+    final c = await monter(tester, connecte: true);
+    c.read(routerProvider).push('/equipement/nouveau?labo=1');
+    await capture(tester, '8-formulaire');
+  });
+
+  testWidgets('laboratoires admin', (tester) async {
+    final c = await monter(tester, connecte: true, admin: true);
+    c.read(routerProvider).go('/laboratoires');
+    await capture(tester, '9-laboratoires-admin');
+  });
+
+  testWidgets('equipements clair', (tester) async {
+    final c = await monter(tester, connecte: true, theme: ThemeMode.light);
+    c.read(routerProvider).go('/equipements');
+    await capture(tester, '10-equipements-clair');
+  });
+
+  testWidgets('profil sombre', (tester) async {
+    final c = await monter(tester, connecte: true);
+    c.read(routerProvider).go('/profil');
+    await capture(tester, '11-profil');
+  });
+
+  testWidgets('detail retire', (tester) async {
+    final c = await monter(tester, connecte: true);
+    c.read(routerProvider).push('/equipement/13');
+    await capture(tester, '12-detail-retire');
+  });
+
+  testWidgets('feuille nouveau laboratoire', (tester) async {
+    final c = await monter(tester, connecte: true, admin: true);
+    c.read(routerProvider).go('/laboratoires');
+    for (var i = 0; i < 8; i++) {
+      await tester.pump(const Duration(milliseconds: 250));
+    }
+    await tester.tap(find.text('Nouveau'));
+    await capture(tester, '13-feuille-labo');
+  });
+
+  testWidgets('feuille coordonnees profil', (tester) async {
+    final c = await monter(tester, connecte: true);
+    c.read(routerProvider).go('/profil');
+    for (var i = 0; i < 8; i++) {
+      await tester.pump(const Duration(milliseconds: 250));
+    }
+    await tester.tap(find.text('Modifier'));
+    await capture(tester, '14-feuille-profil');
   });
 }

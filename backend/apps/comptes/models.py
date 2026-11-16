@@ -1,5 +1,14 @@
+import os
+import uuid
+
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+
+
+def chemin_photo_profil(instance, nom_fichier: str) -> str:
+    """Nom unique à chaque envoi : l'URL change, donc l'app ne réaffiche jamais une ancienne photo en cache."""
+    extension = os.path.splitext(nom_fichier)[1].lower() or ".jpg"
+    return f"profils/{instance.pk or 'nouveau'}-{uuid.uuid4().hex[:10]}{extension}"
 
 
 class Utilisateur(AbstractUser):
@@ -15,6 +24,7 @@ class Utilisateur(AbstractUser):
     role = models.CharField("rôle", max_length=20, choices=Role.choices, default=Role.ETUDIANT)
     matricule = models.CharField("matricule", max_length=50, blank=True)
     telephone = models.CharField("téléphone", max_length=30, blank=True)
+    photo = models.ImageField("photo de profil", upload_to=chemin_photo_profil, blank=True)
 
     class Meta:
         verbose_name = "utilisateur"

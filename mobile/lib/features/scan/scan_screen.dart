@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,6 +11,7 @@ import '../../core/theme/semantique.dart';
 import '../../core/widgets/composants.dart';
 import '../equipements/equipements_repository.dart';
 import '../equipements/widgets.dart';
+import '../../core/widgets/feuille.dart';
 
 class ScanScreen extends ConsumerStatefulWidget {
   const ScanScreen({super.key});
@@ -56,7 +55,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> with SingleTickerProvid
     await Future<void>.delayed(const Duration(milliseconds: 280));
     if (!mounted) return;
 
-    final allerFiche = await showModalBottomSheet<int>(
+    final allerFiche = await ouvrirFeuille<int>(
       context: context,
       isScrollControlled: true,
       builder: (_) => _FicheResultat(code: code),
@@ -234,14 +233,11 @@ class _CadrePainter extends CustomPainter {
         ..color = Colors.white.withValues(alpha: .18),
     );
 
-    // Coins en dégradé (ou verts en cas de succès)
-    final shader = (succes ? const LinearGradient(colors: [Palette.emerald, Palette.emerald]) : Palette.signature).createShader(
-      fenetre,
-    );
+    // Coins du cadre : blancs, verts quand le code est lu
     final coin = Paint()
-      ..shader = shader
+      ..color = succes ? Palette.emerald : Colors.white
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 4.5
+      ..strokeWidth = 4
       ..strokeCap = StrokeCap.round;
     const l = 34.0;
     const r = 26.0;
@@ -274,24 +270,9 @@ class _CadrePainter extends CustomPainter {
       return;
     }
 
-    // Faisceau laser horizontal avec halo
+    // Ligne de lecture : un trait fin, sans halo
     final y = f.top + 18 + (f.height - 36) * laser;
-    final faisceau = Rect.fromLTWH(f.left + 18, y - 1.5, f.width - 36, 3);
-    canvas.drawRect(
-      faisceau.inflate(10),
-      Paint()
-        ..shader = LinearGradient(
-          colors: [Palette.aqua.withValues(alpha: 0), Palette.aqua.withValues(alpha: .35), Palette.aqua.withValues(alpha: 0)],
-        ).createShader(faisceau)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 12),
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(faisceau, const Radius.circular(2)),
-      Paint()
-        ..shader = const LinearGradient(
-          colors: [Color(0x0022D3EE), Palette.aqua, Color(0xFFFFFFFF), Palette.aqua, Color(0x0022D3EE)],
-        ).createShader(faisceau),
-    );
+    canvas.drawRect(Rect.fromLTWH(f.left + 18, y - 1, f.width - 36, 2), Paint()..color = Colors.white.withValues(alpha: .85));
   }
 
   @override
@@ -390,7 +371,7 @@ class _Trouve extends StatelessWidget {
         const SizedBox(height: 18),
         Row(
           children: [
-            GradientIcon(icone: visuel.icone, teintes: visuel.teintes, taille: 64, rayon: 20),
+            IconeTuile(icone: visuel.icone, couleur: visuel.couleur, taille: 56, rayon: 16),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
@@ -398,7 +379,7 @@ class _Trouve extends StatelessWidget {
                 children: [
                   Text(e.nom, maxLines: 2, overflow: TextOverflow.ellipsis, style: context.text.titleLarge),
                   const SizedBox(height: 4),
-                  Text(e.code, style: styleCode.copyWith(color: Palette.violet, fontSize: 13.5)),
+                  Text(e.code, style: styleCode.copyWith(color: context.accent, fontSize: 13.5)),
                 ],
               ),
             ),
@@ -433,7 +414,11 @@ class _Trouve extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 22),
-        GradientButton(label: 'Voir la fiche', icone: Icons.arrow_forward_rounded, onPressed: () => Navigator.pop(context, e.id)),
+        BoutonPrincipal(
+          label: 'Voir la fiche',
+          icone: Icons.arrow_forward_rounded,
+          onPressed: () => Navigator.pop(context, e.id),
+        ),
         const SizedBox(height: 6),
         TextButton(
           onPressed: () => Navigator.pop(context),
@@ -482,7 +467,7 @@ class _Probleme extends StatelessWidget {
         style: context.text.bodyMedium?.copyWith(color: context.lab.textMuted),
       ),
       const SizedBox(height: 22),
-      GradientButton(label: 'Réessayer', icone: Icons.qr_code_scanner_rounded, onPressed: () => Navigator.pop(context)),
+      BoutonPrincipal(label: 'Réessayer', icone: Icons.qr_code_scanner_rounded, onPressed: () => Navigator.pop(context)),
     ],
   );
 }
@@ -554,21 +539,14 @@ class _BoutonVerreSombre extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Pressable(
     onTap: onTap,
-    child: ClipOval(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 220),
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: actif ? Palette.gold.withValues(alpha: .9) : Colors.white.withValues(alpha: .14),
-            border: Border.all(color: Colors.white.withValues(alpha: .22)),
-          ),
-          child: Icon(icone, color: actif ? Palette.ink950 : Colors.white.withValues(alpha: onTap == null ? .4 : 1)),
-        ),
+    child: Container(
+      width: 46,
+      height: 46,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        color: actif ? Colors.white : Colors.black.withValues(alpha: .6),
       ),
+      child: Icon(icone, color: actif ? Palette.ink950 : Colors.white.withValues(alpha: onTap == null ? .4 : 1)),
     ),
   );
 }
@@ -580,19 +558,9 @@ class _PastilleVerre extends StatelessWidget {
   final EdgeInsetsGeometry padding;
 
   @override
-  Widget build(BuildContext context) => ClipRRect(
-    borderRadius: BorderRadius.circular(99),
-    child: BackdropFilter(
-      filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-      child: Container(
-        padding: padding,
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: .14),
-          borderRadius: BorderRadius.circular(99),
-          border: Border.all(color: Colors.white.withValues(alpha: .22)),
-        ),
-        child: child,
-      ),
-    ),
+  Widget build(BuildContext context) => Container(
+    padding: padding,
+    decoration: BoxDecoration(color: Colors.black.withValues(alpha: .6), borderRadius: BorderRadius.circular(14)),
+    child: child,
   );
 }

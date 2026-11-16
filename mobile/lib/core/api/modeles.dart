@@ -11,6 +11,8 @@ class Utilisateur {
     this.email = '',
     this.matricule = '',
     this.telephone = '',
+    this.laboratoiresGeres = const [],
+    this.photo,
   });
 
   final int id;
@@ -23,6 +25,12 @@ class Utilisateur {
   final String matricule;
   final String telephone;
 
+  /// Identifiants des laboratoires dont il est responsable.
+  final List<int> laboratoiresGeres;
+
+  /// Adresse de la photo de profil (null = pas de photo : on affiche les initiales).
+  final String? photo;
+
   String get nomComplet => [prenom, nom].where((s) => s.isNotEmpty).join(' ').trim().isEmpty
       ? username
       : [prenom, nom].where((s) => s.isNotEmpty).join(' ');
@@ -32,7 +40,13 @@ class Utilisateur {
     return parties.map((p) => p[0].toUpperCase()).join();
   }
 
+  bool get estAdmin => role == 'admin';
+
+  /// Peut créer/modifier/supprimer des équipements (admin, ou responsable pour ses laboratoires).
   bool get peutGerer => role == 'admin' || role == 'responsable';
+
+  /// Peut gérer les équipements de ce laboratoire.
+  bool peutGererLabo(int laboratoireId) => estAdmin || (role == 'responsable' && laboratoiresGeres.contains(laboratoireId));
 
   factory Utilisateur.fromJson(Map<String, dynamic> j) => Utilisateur(
     id: j['id'] as int,
@@ -44,6 +58,8 @@ class Utilisateur {
     email: (j['email'] ?? '') as String,
     matricule: (j['matricule'] ?? '') as String,
     telephone: (j['telephone'] ?? '') as String,
+    laboratoiresGeres: ((j['laboratoires_geres'] ?? const []) as List).cast<int>(),
+    photo: j['photo'] as String?,
   );
 
   Map<String, dynamic> toJson() => {
@@ -56,6 +72,8 @@ class Utilisateur {
     'email': email,
     'matricule': matricule,
     'telephone': telephone,
+    'laboratoires_geres': laboratoiresGeres,
+    'photo': photo,
   };
 }
 
@@ -64,6 +82,7 @@ class Equipement {
     required this.id,
     required this.code,
     required this.nom,
+    required this.categorieId,
     required this.categorieNom,
     required this.laboratoireId,
     required this.laboratoireNom,
@@ -82,6 +101,7 @@ class Equipement {
   final int id;
   final String code;
   final String nom;
+  final int categorieId;
   final String categorieNom;
   final int laboratoireId;
   final String laboratoireNom;
@@ -102,6 +122,7 @@ class Equipement {
     id: j['id'] as int,
     code: (j['code'] ?? '') as String,
     nom: j['nom'] as String,
+    categorieId: j['categorie'] as int,
     categorieNom: (j['categorie_nom'] ?? '') as String,
     laboratoireId: j['laboratoire'] as int,
     laboratoireNom: (j['laboratoire_nom'] ?? '') as String,
@@ -143,6 +164,7 @@ class Laboratoire {
     required this.nom,
     required this.localisation,
     required this.nbEquipements,
+    this.responsables = const [],
   });
 
   final int id;
@@ -150,6 +172,7 @@ class Laboratoire {
   final String nom;
   final String localisation;
   final int nbEquipements;
+  final List<int> responsables;
 
   factory Laboratoire.fromJson(Map<String, dynamic> j) => Laboratoire(
     id: j['id'] as int,
@@ -157,7 +180,17 @@ class Laboratoire {
     nom: j['nom'] as String,
     localisation: (j['localisation'] ?? '') as String,
     nbEquipements: (j['nb_equipements'] ?? 0) as int,
+    responsables: ((j['responsables'] ?? const []) as List).cast<int>(),
   );
+}
+
+class Categorie {
+  const Categorie({required this.id, required this.nom});
+
+  final int id;
+  final String nom;
+
+  factory Categorie.fromJson(Map<String, dynamic> j) => Categorie(id: j['id'] as int, nom: j['nom'] as String);
 }
 
 class Statistiques {

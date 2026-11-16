@@ -10,8 +10,8 @@ class UtilisateurAdmin(UserAdmin):
     list_filter = ("role", "is_active")
     search_fields = ("username", "first_name", "last_name", "matricule")
     fieldsets = UserAdmin.fieldsets + (
-        ("LabTrack", {"fields": ("role", "matricule", "telephone")}),
+        ("LabTrack", {"fields": ("role", "matricule", "telephone", "photo")}),
     )
     add_fieldsets = UserAdmin.add_fieldsets + (
-        ("LabTrack", {"fields": ("role", "matricule", "telephone")}),
+        ("LabTrack", {"fields": ("role", "matricule", "telephone", "photo")}),
     )

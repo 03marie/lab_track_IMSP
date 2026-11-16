@@ -1,43 +1,26 @@
 import 'package:flutter/material.dart';
 
-/// Palette LabTrack — « Nuit d'encre & Aurore ».
+/// Palette LabTrack — sobre et institutionnelle.
 ///
-/// Un fond encre profond, une signature en dégradé iris → aqua,
-/// et une touche d'or pour les détails précieux.
+/// Un seul bleu posé comme couleur d'accent, des neutres légèrement froids,
+/// des couleurs de statut atténuées. Pas de dégradés ni de halos : des aplats.
 abstract final class Palette {
-  // Encres (mode sombre)
-  static const ink950 = Color(0xFF05070D);
-  static const ink900 = Color(0xFF0A0E1A);
-  static const ink850 = Color(0xFF0F1424);
-  static const ink800 = Color(0xFF151B2E);
-  static const ink700 = Color(0xFF1E2640);
-  static const ink600 = Color(0xFF2A3354);
+  // Accent (boutons, éléments actifs)
+  static const accent = Color(0xFF3A5FD0);
 
-  // Porcelaines (mode clair)
-  static const porcelain = Color(0xFFF5F6FB);
-  static const mist = Color(0xFFE8EAF3);
-
-  // Signature
-  static const iris = Color(0xFF7C5CFF);
-  static const violet = Color(0xFFA78BFA);
-  static const aqua = Color(0xFF22D3EE);
-  static const gold = Color(0xFFF2C46D);
-  static const goldDeep = Color(0xFFB7791F); // or lisible sur fond clair
+  // Teintes secondaires, volontairement posées
+  static const teal = Color(0xFF2F8C8C);
+  static const ochre = Color(0xFFB7832B);
 
   // Statuts
-  static const emerald = Color(0xFF34D399);
-  static const amber = Color(0xFFFBBF24);
-  static const rose = Color(0xFFFB7185);
-  static const slate = Color(0xFF94A3B8);
+  static const emerald = Color(0xFF2E9467);
+  static const amber = Color(0xFFC48A1C);
+  static const rose = Color(0xFFD0505F);
+  static const slate = Color(0xFF8A93A3);
 
-  static const signature = LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [iris, aqua]);
-
-  static const signatureSoft = LinearGradient(
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    colors: [Color(0xFF6D4DFF), Color(0xFF8B5CF6), Color(0xFF22D3EE)],
-    stops: [0, .45, 1],
-  );
+  // Neutres sombres utilisés ponctuellement (caméra, messages)
+  static const ink950 = Color(0xFF080A0E);
+  static const ink800 = Color(0xFF1B2029);
 }
 
 /// Couleurs dépendant du thème (sombre / clair), accessibles via `context.lab`.
@@ -50,8 +33,7 @@ class LabColors extends ThemeExtension<LabColors> {
     required this.border,
     required this.text,
     required this.textMuted,
-    required this.glass,
-    required this.glassBorder,
+    required this.accent,
     required this.shadow,
   });
 
@@ -61,32 +43,31 @@ class LabColors extends ThemeExtension<LabColors> {
   final Color border;
   final Color text;
   final Color textMuted;
-  final Color glass;
-  final Color glassBorder;
+
+  /// Accent lisible en texte/icône sur le fond du thème (plus clair en mode sombre).
+  final Color accent;
   final Color shadow;
 
   static const dark = LabColors(
-    background: Palette.ink900,
-    surface: Palette.ink850,
-    surfaceHigh: Palette.ink800,
-    border: Color(0x14FFFFFF),
-    text: Color(0xFFF4F6FB),
-    textMuted: Color(0xFF8A93AD),
-    glass: Color(0x991A2138),
-    glassBorder: Color(0x1FFFFFFF),
+    background: Color(0xFF0F1217),
+    surface: Color(0xFF171B22),
+    surfaceHigh: Color(0xFF1F242D),
+    border: Color(0xFF2C333E),
+    text: Color(0xFFEAECF0),
+    textMuted: Color(0xFF9097A4),
+    accent: Color(0xFF86A2EE),
     shadow: Color(0x66000000),
   );
 
   static const light = LabColors(
-    background: Palette.porcelain,
+    background: Color(0xFFF1F2F5),
     surface: Colors.white,
-    surfaceHigh: Color(0xFFF0F1F8),
-    border: Color(0xFFE4E6F0),
-    text: Color(0xFF0E1322),
-    textMuted: Color(0xFF5E6781),
-    glass: Color(0xCCFFFFFF),
-    glassBorder: Color(0x14000000),
-    shadow: Color(0x1A1E2640),
+    surfaceHigh: Color(0xFFF0F2F6),
+    border: Color(0xFFD5DAE2),
+    text: Color(0xFF14171F),
+    textMuted: Color(0xFF586070),
+    accent: Color(0xFF2F52C0),
+    shadow: Color(0x1F101828),
   );
 
   @override
@@ -97,8 +78,7 @@ class LabColors extends ThemeExtension<LabColors> {
     Color? border,
     Color? text,
     Color? textMuted,
-    Color? glass,
-    Color? glassBorder,
+    Color? accent,
     Color? shadow,
   }) => LabColors(
     background: background ?? this.background,
@@ -107,8 +87,7 @@ class LabColors extends ThemeExtension<LabColors> {
     border: border ?? this.border,
     text: text ?? this.text,
     textMuted: textMuted ?? this.textMuted,
-    glass: glass ?? this.glass,
-    glassBorder: glassBorder ?? this.glassBorder,
+    accent: accent ?? this.accent,
     shadow: shadow ?? this.shadow,
   );
 
@@ -122,8 +101,7 @@ class LabColors extends ThemeExtension<LabColors> {
       border: Color.lerp(border, other.border, t)!,
       text: Color.lerp(text, other.text, t)!,
       textMuted: Color.lerp(textMuted, other.textMuted, t)!,
-      glass: Color.lerp(glass, other.glass, t)!,
-      glassBorder: Color.lerp(glassBorder, other.glassBorder, t)!,
+      accent: Color.lerp(accent, other.accent, t)!,
       shadow: Color.lerp(shadow, other.shadow, t)!,
     );
   }
@@ -134,6 +112,9 @@ extension LabThemeContext on BuildContext {
   TextTheme get text => Theme.of(this).textTheme;
   bool get isDark => Theme.of(this).brightness == Brightness.dark;
 
-  /// Or adapté au thème (contraste suffisant en mode clair).
-  Color get or => isDark ? Palette.gold : Palette.goldDeep;
+  /// Couleur d'accent lisible sur le fond du thème courant.
+  Color get accent => lab.accent;
+
+  /// Version d'une couleur de statut lisible sur le fond du thème (assombrie en mode clair).
+  Color lisible(Color c) => isDark ? c : Color.lerp(c, Colors.black, .38)!;
 }

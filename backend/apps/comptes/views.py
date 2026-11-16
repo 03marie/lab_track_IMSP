@@ -9,6 +9,7 @@ from .models import Utilisateur
 from .permissions import EstAdminOuResponsable, EstPersonnel
 from .serializers import (
     ChangementMotDePasseSerializer,
+    ProfilSerializer,
     UtilisateurCreationSerializer,
     UtilisateurSerializer,
 )
@@ -19,7 +20,30 @@ class MoiView(APIView):
 
     @extend_schema(responses=UtilisateurSerializer)
     def get(self, request):
-        return Response(UtilisateurSerializer(request.user).data)
+        return Response(UtilisateurSerializer(request.user, context={"request": request}).data)
+
+    @extend_schema(request=ProfilSerializer, responses=UtilisateurSerializer)
+    def patch(self, request):
+        """Modifie ses propres coordonnées (e-mail, téléphone) et sa photo de profil."""
+        utilisateur = request.user
+        ancienne_photo = utilisateur.photo.name if utilisateur.photo else ""
+        s = ProfilSerializer(utilisateur, data=request.data, partial=True, context={"request": request})
+        s.is_valid(raise_exception=True)
+        s.save()
+        # La photo remplacée n'est plus utile : on libère l'espace sur le serveur.
+        if ancienne_photo and utilisateur.photo.name != ancienne_photo:
+            utilisateur.photo.storage.delete(ancienne_photo)
+        return Response(UtilisateurSerializer(utilisateur, context={"request": request}).data)
+
+
+class PhotoProfilView(APIView):
+    @extend_schema(request=None, responses=UtilisateurSerializer)
+    def delete(self, request):
+        """Retire sa photo de profil."""
+        utilisateur = request.user
+        if utilisateur.photo:
+            utilisateur.photo.delete(save=True)
+        return Response(UtilisateurSerializer(utilisateur, context={"request": request}).data)
 
 
 class ChangerMotDePasseView(APIView):
@@ -40,7 +64,7 @@ class UtilisateurViewSet(viewsets.ModelViewSet):
     - Suppression : désactivée, on désactive le compte (`is_active`) pour garder l'historique.
     """
 
-    queryset = Utilisateur.objects.all()
+    queryset = Utilisateur.objects.prefetch_related("laboratoires_geres")
     filterset_fields = ["role", "is_active"]
     search_fields = ["username", "first_name", "last_name", "matricule"]
     http_method_names = ["get", "post", "patch", "head", "options"]

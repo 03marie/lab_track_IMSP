@@ -1,9 +1,15 @@
+import shutil
+import tempfile
+from io import BytesIO
+
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
+from PIL import Image
 from rest_framework.test import APIClient
 
 from apps.comptes.models import Utilisateur
 
-from .models import Categorie, Equipement, Laboratoire, Mouvement
+from .models import Categorie, Equipement, Laboratoire, Mouvement, enregistrer_mouvement
 
 
 class BaseAPITest(TestCase):
@@ -112,9 +118,6 @@ class EquipementAPITests(BaseAPITest):
         m = e.mouvements.get(type=Mouvement.Type.MODIFICATION)
         self.assertIn("emplacement", m.details)
 
-    def test_pas_de_suppression_via_l_api(self):
-        e = Equipement.objects.create(nom="A", categorie=self.categorie, laboratoire=self.labo_elec)
-        self.assertEqual(self.client_de(self.admin).delete(f"/api/v1/equipements/{e.pk}/").status_code, 405)
 
 
 class RechercheParCodeTests(BaseAPITest):
@@ -217,3 +220,176 @@ class HistoriqueTests(BaseAPITest):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.data["count"], 1)
         self.assertEqual(r.data["results"][0]["type"], "creation")
+
+
+class SuppressionLaboratoireTests(BaseAPITest):
+    def test_admin_supprime_un_laboratoire_vide(self):
+        r = self.client_de(self.admin).delete(f"/api/v1/laboratoires/{self.labo_info.pk}/")
+        self.assertEqual(r.status_code, 204)
+        self.assertFalse(Laboratoire.objects.filter(pk=self.labo_info.pk).exists())
+
+    def test_laboratoire_non_vide_refuse_avec_message(self):
+        Equipement.objects.create(nom="A", categorie=self.categorie, laboratoire=self.labo_elec)
+        r = self.client_de(self.admin).delete(f"/api/v1/laboratoires/{self.labo_elec.pk}/")
+        self.assertEqual(r.status_code, 409)
+        self.assertIn("contient encore 1 équipement", r.data["detail"])
+        self.assertTrue(Laboratoire.objects.filter(pk=self.labo_elec.pk).exists())
+
+    def test_les_equipements_retires_comptent_dans_le_refus(self):
+        Equipement.objects.create(nom="A", categorie=self.categorie, laboratoire=self.labo_elec,
+                                  statut=Equipement.Statut.RETIRE)
+        r = self.client_de(self.admin).delete(f"/api/v1/laboratoires/{self.labo_elec.pk}/")
+        self.assertEqual(r.status_code, 409)
+        self.assertIn("1 retiré", r.data["detail"])
+
+    def test_un_responsable_ne_supprime_pas_de_laboratoire(self):
+        r = self.client_de(self.resp_elec).delete(f"/api/v1/laboratoires/{self.labo_info.pk}/")
+        self.assertEqual(r.status_code, 403)
+
+    def test_creation_normalise_le_code_en_majuscules(self):
+        r = self.client_de(self.admin).post(
+            "/api/v1/laboratoires/", {"code": " chim ", "nom": "Chimie", "localisation": "Bât. C"}
+        )
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual(r.data["code"], "CHIM")
+
+    def test_nb_equipements_ignore_les_retires(self):
+        Equipement.objects.create(nom="A", categorie=self.categorie, laboratoire=self.labo_elec)
+        Equipement.objects.create(nom="B", categorie=self.categorie, laboratoire=self.labo_elec,
+                                  statut=Equipement.Statut.RETIRE)
+        r = self.client_de(self.technicien).get("/api/v1/laboratoires/")
+        elec = next(l for l in r.data["results"] if l["code"] == "ELEC")
+        self.assertEqual(elec["nb_equipements"], 1)
+
+
+class SuppressionEquipementTests(BaseAPITest):
+    def creer(self, **extra):
+        e = Equipement.objects.create(nom="A", categorie=self.categorie, laboratoire=self.labo_elec, **extra)
+        enregistrer_mouvement(e, Mouvement.Type.CREATION, self.resp_elec, "créé")
+        return e
+
+    def test_equipement_jamais_utilise_supprime_definitivement(self):
+        e = self.creer()
+        r = self.client_de(self.resp_elec).delete(f"/api/v1/equipements/{e.pk}/")
+        self.assertEqual(r.status_code, 204)
+        self.assertFalse(Equipement.objects.filter(pk=e.pk).exists())
+
+    def test_une_modification_ne_compte_pas_comme_historique(self):
+        e = self.creer()
+        enregistrer_mouvement(e, Mouvement.Type.MODIFICATION, self.resp_elec, "emplacement")
+        r = self.client_de(self.resp_elec).delete(f"/api/v1/equipements/{e.pk}/")
+        self.assertEqual(r.status_code, 204)
+
+    def test_equipement_qui_a_servi_est_refuse_et_conserve(self):
+        e = self.creer()
+        enregistrer_mouvement(e, Mouvement.Type.EMPRUNT, self.resp_elec, "prêté")
+        r = self.client_de(self.resp_elec).delete(f"/api/v1/equipements/{e.pk}/")
+        self.assertEqual(r.status_code, 409)
+        self.assertIn("Retirez-le du parc", r.data["detail"])
+        self.assertTrue(Equipement.objects.filter(pk=e.pk).exists())
+
+    def test_equipement_emprunte_est_refuse(self):
+        e = self.creer(statut=Equipement.Statut.EMPRUNTE)
+        r = self.client_de(self.admin).delete(f"/api/v1/equipements/{e.pk}/")
+        self.assertEqual(r.status_code, 409)
+
+    def test_responsable_d_un_autre_labo_refuse(self):
+        e = self.creer()
+        autre = Utilisateur.objects.create_user("resp_info", password="motdepasse-123", role="responsable")
+        self.assertEqual(self.client_de(autre).delete(f"/api/v1/equipements/{e.pk}/").status_code, 403)
+
+    def test_technicien_ne_supprime_pas(self):
+        e = self.creer()
+        self.assertEqual(self.client_de(self.technicien).delete(f"/api/v1/equipements/{e.pk}/").status_code, 403)
+
+
+class EquipementsRetiresTests(BaseAPITest):
+    def setUp(self):
+        self.actif = Equipement.objects.create(nom="Actif", categorie=self.categorie, laboratoire=self.labo_elec)
+        self.retire = Equipement.objects.create(nom="Retiré", categorie=self.categorie, laboratoire=self.labo_elec,
+                                                statut=Equipement.Statut.RETIRE)
+        self.client = self.client_de(self.technicien)
+
+    def test_la_liste_masque_les_retires_par_defaut(self):
+        r = self.client.get("/api/v1/equipements/")
+        self.assertEqual([e["nom"] for e in r.data["results"]], ["Actif"])
+
+    def test_on_les_retrouve_avec_le_filtre_statut(self):
+        r = self.client.get("/api/v1/equipements/?statut=retire")
+        self.assertEqual([e["nom"] for e in r.data["results"]], ["Retiré"])
+
+    def test_la_fiche_d_un_retire_reste_consultable(self):
+        self.assertEqual(self.client.get(f"/api/v1/equipements/{self.retire.pk}/").status_code, 200)
+        self.assertEqual(self.client.get(f"/api/v1/equipements/par-code/{self.retire.code}/").status_code, 200)
+
+    def test_les_etiquettes_d_un_labo_ignorent_les_retires(self):
+        r = self.client.get(f"/api/v1/equipements/etiquettes/?laboratoire={self.labo_elec.pk}")
+        self.assertEqual(r.status_code, 200)
+
+    def test_etiquette_d_un_retire_possible_par_id(self):
+        r = self.client.get(f"/api/v1/equipements/etiquettes/?ids={self.retire.pk}")
+        self.assertEqual(r.status_code, 200)
+
+    def test_total_exclut_les_retires_mais_ils_sont_comptes_a_part(self):
+        r = self.client.get("/api/v1/equipements/statistiques/")
+        self.assertEqual(r.data["total"], 1)
+        self.assertEqual(r.data["par_statut"]["retire"], 1)
+
+
+class FormulaireMobileTests(BaseAPITest):
+    """Reproduit exactement ce qu'envoie l'application mobile : un formulaire multipart."""
+
+    def setUp(self):
+        self.dossier = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.dossier, ignore_errors=True)
+        reglage = override_settings(MEDIA_ROOT=self.dossier)
+        reglage.enable()
+        self.addCleanup(reglage.disable)
+
+    def champs(self, **extra):
+        champs = {
+            "nom": "Multimètre", "categorie": self.categorie.pk, "laboratoire": self.labo_elec.pk,
+            "emplacement": "", "marque": "", "modele": "", "numero_serie": "", "description": "",
+            "date_acquisition": "",   # l'app envoie une chaîne vide quand la date n'est pas renseignée
+        }
+        champs.update(extra)
+        return champs
+
+    def photo(self):
+        tampon = BytesIO()
+        Image.new("RGB", (30, 30), "green").save(tampon, format="JPEG")
+        return SimpleUploadedFile("photo_1.jpg", tampon.getvalue(), content_type="image/jpeg")
+
+    def test_creation_multipart_sans_date_ni_photo(self):
+        r = self.client_de(self.resp_elec).post("/api/v1/equipements/", self.champs(), format="multipart")
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertIsNone(r.data["date_acquisition"])
+        self.assertTrue(r.data["code"].startswith("IMSP-EQ-"))
+
+    def test_creation_multipart_avec_date_et_photo(self):
+        r = self.client_de(self.resp_elec).post(
+            "/api/v1/equipements/", self.champs(date_acquisition="2024-03-14", photo=self.photo()), format="multipart"
+        )
+        self.assertEqual(r.status_code, 201, r.data)
+        self.assertEqual(r.data["date_acquisition"], "2024-03-14")
+        self.assertIn("/equipements/", r.data["photo"])
+
+    def test_modification_multipart_efface_la_date(self):
+        e = Equipement.objects.create(nom="A", categorie=self.categorie, laboratoire=self.labo_elec, date_acquisition="2024-01-01")
+        r = self.client_de(self.admin).patch(f"/api/v1/equipements/{e.pk}/", self.champs(nom="B"), format="multipart")
+        self.assertEqual(r.status_code, 200, r.data)
+        e.refresh_from_db()
+        self.assertEqual(e.nom, "B")
+        self.assertIsNone(e.date_acquisition)
+
+    def test_nom_vide_refuse_avec_message_sur_le_champ(self):
+        r = self.client_de(self.resp_elec).post("/api/v1/equipements/", self.champs(nom=""), format="multipart")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("nom", r.data)
+
+    def test_creation_puis_etiquette_pdf_comme_dans_l_app(self):
+        client = self.client_de(self.resp_elec)
+        cree = client.post("/api/v1/equipements/", self.champs(), format="multipart").data
+        pdf = client.get(f"/api/v1/equipements/etiquettes/?ids={cree['id']}")
+        self.assertEqual(pdf.status_code, 200)
+        self.assertTrue(pdf.content.startswith(b"%PDF"))

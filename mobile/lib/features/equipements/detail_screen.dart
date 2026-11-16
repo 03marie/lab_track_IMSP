@@ -9,8 +9,11 @@ import '../../core/format.dart';
 import '../../core/theme/palette.dart';
 import '../../core/theme/semantique.dart';
 import '../../core/widgets/composants.dart';
+import '../auth/auth_controller.dart';
+import 'equipement_actions.dart';
 import 'equipements_repository.dart';
 import 'widgets.dart';
+import '../../core/widgets/feuille.dart';
 
 class DetailEquipementScreen extends ConsumerWidget {
   const DetailEquipementScreen({super.key, required this.id});
@@ -31,7 +34,7 @@ class DetailEquipementScreen extends ConsumerWidget {
                 alignment: Alignment.centerLeft,
                 child: Padding(
                   padding: const EdgeInsets.all(12),
-                  child: _BoutonVerre(icone: Icons.arrow_back_rounded, onTap: () => context.pop()),
+                  child: _BoutonCarre(icone: Icons.arrow_back_rounded, onTap: () => context.pop()),
                 ),
               ),
               Expanded(
@@ -75,29 +78,35 @@ class _Contenu extends ConsumerWidget {
         slivers: [
           SliverAppBar(
             pinned: true,
-            stretch: true,
-            expandedHeight: 330,
-            backgroundColor: visuel.teintes.first,
+            backgroundColor: context.lab.background,
+            surfaceTintColor: Colors.transparent,
+            leadingWidth: 64,
             leading: Padding(
-              padding: const EdgeInsets.only(left: 12),
+              padding: const EdgeInsets.only(left: 16),
               child: Center(
-                child: _BoutonVerre(icone: Icons.arrow_back_rounded, onTap: () => context.pop()),
+                child: _BoutonCarre(icone: Icons.arrow_back_rounded, onTap: () => context.pop()),
               ),
             ),
-            leadingWidth: 62,
             actions: [
-              _BoutonVerre(icone: Icons.view_week_rounded, onTap: () => _afficherCodeBarres(context, e)),
-              const SizedBox(width: 12),
+              if (ref.watch(utilisateurProvider)?.peutGererLabo(e.laboratoireId) ?? false)
+                _MenuEquipement(e: e)
+              else
+                _BoutonCarre(icone: Icons.view_week_rounded, onTap: () => _afficherCodeBarres(context, e)),
+              const SizedBox(width: 16),
             ],
-            flexibleSpace: FlexibleSpaceBar(
-              stretchModes: const [StretchMode.zoomBackground, StretchMode.fadeTitle],
-              background: _EnTeteImmersif(e: e, teintes: visuel.teintes, icone: visuel.icone),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+              child: Entree(
+                child: _EnTeteFiche(e: e, couleur: visuel.couleur, icone: visuel.icone),
+              ),
             ),
           ),
           SliverToBoxAdapter(
             child: Builder(
               builder: (context) => Padding(
-                padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -109,6 +118,7 @@ class _Contenu extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: 18),
+                    if (e.statut == 'retire') ...[Entree(index: 1, child: _BandeauRetire()), const SizedBox(height: 14)],
                     Entree(index: 1, child: _ActionsRapides(e: e)),
                     const SizedBox(height: 26),
                     const Entree(index: 2, child: TitreSection('Informations')),
@@ -144,141 +154,64 @@ class _Contenu extends ConsumerWidget {
   }
 }
 
-class _EnTeteImmersif extends StatelessWidget {
-  const _EnTeteImmersif({required this.e, required this.teintes, required this.icone});
+/// En-tête de la fiche : photo (si elle existe), icône de catégorie, nom, code et catégorie.
+class _EnTeteFiche extends StatelessWidget {
+  const _EnTeteFiche({required this.e, required this.couleur, required this.icone});
 
   final Equipement e;
-  final List<Color> teintes;
+  final Color couleur;
   final IconData icone;
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      fit: StackFit.expand,
+    final lab = context.lab;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (e.photo != null)
-          Image.network(e.photo!, fit: BoxFit.cover, errorBuilder: (_, _, _) => const SizedBox.shrink())
-        else
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [teintes.first, teintes.last, Palette.ink900],
+        if (e.photo != null) ...[
+          ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: AspectRatio(
+              aspectRatio: 16 / 10,
+              child: Image.network(
+                e.photo!,
+                fit: BoxFit.cover,
+                errorBuilder: (_, _, _) => ColoredBox(color: lab.surfaceHigh),
               ),
             ),
           ),
-        // Motif de cercles concentriques
-        Positioned(right: -80, top: -40, child: _Anneaux(couleur: Colors.white.withValues(alpha: .1))),
-        // Voile pour la lisibilité du texte
-        const DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0x33000000), Color(0x00000000), Color(0x99000000)],
-              stops: [0, .4, 1],
+          const SizedBox(height: 16),
+        ],
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Hero(
+              tag: 'equipement-${e.id}',
+              child: IconeTuile(icone: icone, couleur: couleur, taille: 52, rayon: 14),
             ),
-          ),
-        ),
-        // Bord arrondi de la feuille de contenu, dessiné dans l'en-tête (toujours visible au-dessus).
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: -1,
-          child: Container(
-            height: 30,
-            decoration: BoxDecoration(
-              color: context.lab.background,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-            ),
-          ),
-        ),
-        Positioned(
-          left: 24,
-          right: 24,
-          bottom: 52,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Hero(
-                tag: 'equipement-${e.id}',
-                child: Container(
-                  width: 72,
-                  height: 72,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: .18),
-                    borderRadius: BorderRadius.circular(22),
-                    border: Border.all(color: Colors.white.withValues(alpha: .35)),
-                  ),
-                  child: Icon(icone, color: Colors.white, size: 36),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                e.nom,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -.8,
-                  height: 1.1,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Row(
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha: .25),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(e.code, style: styleCode.copyWith(color: Colors.white, fontSize: 13)),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      e.categorieNom,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: Colors.white.withValues(alpha: .85), fontWeight: FontWeight.w600),
-                    ),
+                  Text(e.nom, style: context.text.headlineSmall?.copyWith(height: 1.15)),
+                  const SizedBox(height: 4),
+                  Wrap(
+                    spacing: 10,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(e.code, style: styleCode.copyWith(color: lab.accent, fontSize: 13)),
+                      Text(e.categorieNom, style: context.text.bodySmall),
+                    ],
                   ),
                 ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ],
     );
   }
-}
-
-class _Anneaux extends StatelessWidget {
-  const _Anneaux({required this.couleur});
-  final Color couleur;
-
-  @override
-  Widget build(BuildContext context) => SizedBox(
-    width: 300,
-    height: 300,
-    child: Stack(
-      alignment: Alignment.center,
-      children: [
-        for (final t in [300.0, 220.0, 140.0])
-          Container(
-            width: t,
-            height: t,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: couleur, width: 1.5),
-            ),
-          ),
-      ],
-    ),
-  );
 }
 
 class _ActionsRapides extends StatelessWidget {
@@ -293,8 +226,17 @@ class _ActionsRapides extends StatelessWidget {
           child: _Action(
             icone: Icons.view_week_rounded,
             libelle: 'Code-barres',
-            couleur: Palette.violet,
+            couleur: context.accent,
             onTap: () => _afficherCodeBarres(context, e),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: _Action(
+            icone: Icons.picture_as_pdf_rounded,
+            libelle: 'Étiquette A4',
+            couleur: Palette.ochre,
+            onTap: () => context.push('/etiquettes?ids=${e.id}'),
           ),
         ),
         const SizedBox(width: 10),
@@ -302,22 +244,13 @@ class _ActionsRapides extends StatelessWidget {
           child: _Action(
             icone: Icons.copy_rounded,
             libelle: 'Copier le code',
-            couleur: Palette.aqua,
+            couleur: Palette.teal,
             onTap: () {
               Clipboard.setData(ClipboardData(text: e.code));
               ScaffoldMessenger.of(context)
                 ..hideCurrentSnackBar()
                 ..showSnackBar(SnackBar(content: Text('${e.code} copié')));
             },
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _Action(
-            icone: Icons.qr_code_scanner_rounded,
-            libelle: 'Scanner',
-            couleur: Palette.gold,
-            onTap: () => context.push('/scanner'),
           ),
         ),
       ],
@@ -335,23 +268,17 @@ class _Action extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SurfaceCard(
-    padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
-    radius: 22,
+    padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
     onTap: onTap,
     child: Column(
       children: [
-        Container(
-          width: 42,
-          height: 42,
-          decoration: BoxDecoration(color: couleur.withValues(alpha: .14), borderRadius: BorderRadius.circular(14)),
-          child: Icon(icone, color: couleur, size: 22),
-        ),
+        IconeTuile(icone: icone, couleur: couleur, taille: 42),
         const SizedBox(height: 10),
         Text(
           libelle,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: context.text.labelMedium?.copyWith(fontWeight: FontWeight.w700),
+          style: context.text.labelMedium?.copyWith(fontWeight: FontWeight.w600),
         ),
       ],
     ),
@@ -433,9 +360,6 @@ class _Chronologie extends StatelessWidget {
                             shape: BoxShape.circle,
                             color: apparenceMouvement(m.type).couleur,
                             border: Border.all(color: lab.background, width: 3),
-                            boxShadow: [
-                              BoxShadow(color: apparenceMouvement(m.type).couleur.withValues(alpha: .6), blurRadius: 10),
-                            ],
                           ),
                         ),
                         if (i < mouvements.length - 1)
@@ -443,13 +367,7 @@ class _Chronologie extends StatelessWidget {
                             child: Container(
                               width: 2,
                               margin: const EdgeInsets.symmetric(vertical: 4),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  colors: [apparenceMouvement(m.type).couleur.withValues(alpha: .5), lab.border],
-                                ),
-                              ),
+                              decoration: BoxDecoration(color: lab.border),
                             ),
                           ),
                       ],
@@ -510,7 +428,7 @@ class _Chargement extends StatelessWidget {
     padding: EdgeInsets.zero,
     physics: const NeverScrollableScrollPhysics(),
     children: [
-      const Skeleton(height: 330, radius: 0),
+      const SizedBox(height: 120),
       Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -523,9 +441,9 @@ class _Chargement extends StatelessWidget {
               ],
             ),
             SizedBox(height: 18),
-            Skeleton(height: 100, radius: 22),
+            Skeleton(height: 100, radius: 16),
             SizedBox(height: 26),
-            Skeleton(height: 260, radius: 24),
+            Skeleton(height: 260, radius: 16),
           ],
         ),
       ),
@@ -533,8 +451,8 @@ class _Chargement extends StatelessWidget {
   );
 }
 
-class _BoutonVerre extends StatelessWidget {
-  const _BoutonVerre({required this.icone, required this.onTap});
+class _BoutonCarre extends StatelessWidget {
+  const _BoutonCarre({required this.icone, required this.onTap});
   final IconData icone;
   final VoidCallback onTap;
 
@@ -545,18 +463,18 @@ class _BoutonVerre extends StatelessWidget {
       width: 44,
       height: 44,
       decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: .25),
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white.withValues(alpha: .25)),
+        color: context.lab.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: context.lab.border),
       ),
-      child: Icon(icone, color: Colors.white, size: 22),
+      child: Icon(icone, color: context.lab.text, size: 22),
     ),
   );
 }
 
 /// Feuille affichant le code-barres de l'équipement (pour vérifier ou rescanner une étiquette).
 void _afficherCodeBarres(BuildContext context, Equipement e) {
-  showModalBottomSheet<void>(
+  ouvrirFeuille<void>(
     context: context,
     builder: (_) => Consumer(
       builder: (context, ref, _) {
@@ -576,15 +494,8 @@ void _afficherCodeBarres(BuildContext context, Equipement e) {
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Palette.iris.withValues(alpha: .25),
-                      blurRadius: 30,
-                      offset: const Offset(0, 12),
-                      spreadRadius: -10,
-                    ),
-                  ],
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: context.lab.border),
                 ),
                 child: image.when(
                   data: (octets) => Image.memory(octets, fit: BoxFit.contain, filterQuality: FilterQuality.none),
@@ -606,4 +517,95 @@ void _afficherCodeBarres(BuildContext context, Equipement e) {
       },
     ),
   );
+}
+
+/// Bandeau affiché sur la fiche d'un équipement retiré du parc.
+class _BandeauRetire extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) => SurfaceCard(
+    accent: Palette.amber,
+    padding: const EdgeInsets.all(14),
+    child: Row(
+      children: [
+        const Icon(Icons.archive_rounded, color: Palette.amber),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            'Cet équipement est retiré du parc : il n\'apparaît plus dans les listes mais son historique est conservé.',
+            style: context.text.bodyMedium?.copyWith(height: 1.35),
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+/// Menu « ⋮ » de la fiche : modifier, retirer du parc, supprimer. Réservé à ceux qui gèrent le laboratoire.
+class _MenuEquipement extends ConsumerWidget {
+  const _MenuEquipement({required this.e});
+  final Equipement e;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return PopupMenuButton<String>(
+      tooltip: 'Actions',
+      color: context.lab.surface,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      onSelected: (action) async {
+        switch (action) {
+          case 'modifier':
+            context.push('/equipement/${e.id}/modifier', extra: e);
+          case 'retirer':
+            await retirerEquipementFlow(context, ref, e);
+          case 'supprimer':
+            final issue = await supprimerEquipementFlow(context, ref, e);
+            if (issue == IssueSuppression.supprime && context.mounted) context.pop();
+        }
+      },
+      itemBuilder: (_) => [
+        PopupMenuItem(
+          value: 'modifier',
+          child: Row(
+            children: [
+              Icon(Icons.edit_rounded, color: context.accent),
+              SizedBox(width: 12),
+              Text('Modifier'),
+            ],
+          ),
+        ),
+        if (e.statut != 'retire')
+          const PopupMenuItem(
+            value: 'retirer',
+            child: Row(
+              children: [
+                Icon(Icons.archive_rounded, color: Palette.amber),
+                SizedBox(width: 12),
+                Text('Retirer du parc'),
+              ],
+            ),
+          ),
+        const PopupMenuItem(
+          value: 'supprimer',
+          child: Row(
+            children: [
+              Icon(Icons.delete_outline_rounded, color: Palette.rose),
+              SizedBox(width: 12),
+              Text('Supprimer'),
+            ],
+          ),
+        ),
+      ],
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: context.lab.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: context.lab.border),
+        ),
+        child: Icon(Icons.more_vert_rounded, color: context.lab.text, size: 22),
+      ),
+    );
+  }
 }

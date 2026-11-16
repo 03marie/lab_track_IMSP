@@ -27,7 +27,13 @@ android {
         // is added automatically by Flutter. (https://developer.android.com/studio/build/configure-apk-splits#configure-APK-versions)
         // You can force using the value of versionCode by specifying the `-P force-version-code-ignoring-abi=true`
         // flag during build.
-        versionCode = flutter.versionCode
+        // Numéro de version AUTOMATIQUE et toujours croissant : minutes écoulées depuis le 1er janvier 2026.
+        // Android n'accepte de remplacer une app installée que par une version dont ce numéro est plus
+        // élevé (et signée avec la même clé) : ainsi on installe la nouvelle APK PAR-DESSUS l'ancienne,
+        // sans désinstaller, et les données (serveur, session) sont conservées.
+        // `flutter build apk --build-number=N` reste possible : on prend le plus grand des deux.
+        val versionAuto = ((System.currentTimeMillis() - 1767225600000L) / 60000L).toInt()
+        versionCode = maxOf(versionAuto, flutter.versionCode)
         versionName = flutter.versionName
 
     }

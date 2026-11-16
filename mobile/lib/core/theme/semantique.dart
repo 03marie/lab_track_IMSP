@@ -35,48 +35,55 @@ const etats = <String, Apparence>{
 Apparence apparenceEtat(String etat) => etats[etat] ?? const Apparence('Inconnu', Palette.slate, Icons.help_rounded);
 
 const _mouvements = <String, Apparence>{
-  'creation': Apparence('Création', Palette.aqua, Icons.add_circle_rounded),
-  'modification': Apparence('Modification', Palette.violet, Icons.edit_rounded),
+  'creation': Apparence('Création', Palette.teal, Icons.add_circle_rounded),
+  'modification': Apparence('Modification', Palette.accent, Icons.edit_rounded),
   'emprunt': Apparence('Emprunt', Palette.amber, Icons.outbound_rounded),
   'retour': Apparence('Retour', Palette.emerald, Icons.assignment_return_rounded),
   'panne': Apparence('Panne', Palette.rose, Icons.report_rounded),
-  'reparation': Apparence('Réparation', Palette.aqua, Icons.build_rounded),
-  'inventaire': Apparence('Inventaire', Palette.gold, Icons.fact_check_rounded),
+  'reparation': Apparence('Réparation', Palette.teal, Icons.build_rounded),
+  'inventaire': Apparence('Inventaire', Palette.ochre, Icons.fact_check_rounded),
   'retrait': Apparence('Retrait', Palette.slate, Icons.archive_rounded),
 };
 
 Apparence apparenceMouvement(String type) =>
     _mouvements[type] ?? const Apparence('Événement', Palette.slate, Icons.circle_rounded);
 
-/// Icône et teinte d'une catégorie, devinées à partir de son nom.
-({IconData icone, List<Color> teintes}) visuelCategorie(String nom) {
+/// Teintes posées, partagées par les catégories et les laboratoires.
+const _tons = [
+  Color(0xFF4F6BCB), // indigo
+  Color(0xFF2F8C8C), // sarcelle
+  Color(0xFF3E8E5E), // vert
+  Color(0xFFB7832B), // ocre
+  Color(0xFFC0566B), // rose
+  Color(0xFF4A82B5), // bleu acier
+  Color(0xFF8663B5), // violet
+  Color(0xFFBF6B3A), // terre cuite
+];
+
+int _empreinte(String texte) => texte.codeUnits.fold<int>(7, (a, c) => (a * 31 + c) & 0x7fffffff);
+
+/// Icône et couleur d'une catégorie, devinées à partir de son nom (stables : même nom, même couleur).
+({IconData icone, Color couleur}) visuelCategorie(String nom) {
   final n = nom.toLowerCase();
-  if (n.contains('mesure')) return (icone: Icons.speed_rounded, teintes: const [Color(0xFF7C5CFF), Color(0xFFA78BFA)]);
-  if (n.contains('ordinateur') || n.contains('informatique')) {
-    return (icone: Icons.laptop_mac_rounded, teintes: const [Color(0xFF0EA5E9), Color(0xFF22D3EE)]);
-  }
+  if (n.contains('mesure')) return (icone: Icons.speed_rounded, couleur: _tons[0]);
+  if (n.contains('ordinateur') || n.contains('informatique')) return (icone: Icons.laptop_mac_rounded, couleur: _tons[5]);
   if (n.contains('carte') || n.contains('électron') || n.contains('electron')) {
-    return (icone: Icons.memory_rounded, teintes: const [Color(0xFF10B981), Color(0xFF34D399)]);
+    return (icone: Icons.memory_rounded, couleur: _tons[2]);
   }
-  if (n.contains('optique') || n.contains('micro')) {
-    return (icone: Icons.biotech_rounded, teintes: const [Color(0xFFF59E0B), Color(0xFFF2C46D)]);
-  }
-  if (n.contains('outil')) return (icone: Icons.handyman_rounded, teintes: const [Color(0xFFF43F5E), Color(0xFFFB7185)]);
-  if (n.contains('chimie') || n.contains('verre')) {
-    return (icone: Icons.science_rounded, teintes: const [Color(0xFFEC4899), Color(0xFFF472B6)]);
-  }
-  return (icone: Icons.inventory_2_rounded, teintes: const [Color(0xFF6366F1), Color(0xFF818CF8)]);
+  if (n.contains('optique') || n.contains('micro')) return (icone: Icons.biotech_rounded, couleur: _tons[3]);
+  if (n.contains('outil')) return (icone: Icons.handyman_rounded, couleur: _tons[7]);
+  if (n.contains('chimie') || n.contains('verre')) return (icone: Icons.science_rounded, couleur: _tons[4]);
+  return (icone: Icons.inventory_2_rounded, couleur: _tons[_empreinte(n) % _tons.length]);
 }
 
-/// Teinte stable par laboratoire (dérivée de son code).
-List<Color> teintesLaboratoire(String code) {
-  const jeux = [
-    [Color(0xFF7C5CFF), Color(0xFF22D3EE)],
-    [Color(0xFF10B981), Color(0xFF22D3EE)],
-    [Color(0xFFF59E0B), Color(0xFFF43F5E)],
-    [Color(0xFFEC4899), Color(0xFF8B5CF6)],
-    [Color(0xFF0EA5E9), Color(0xFF6366F1)],
-  ];
-  final h = code.codeUnits.fold<int>(0, (a, c) => a + c);
-  return jeux[h % jeux.length];
+/// Couleur stable par laboratoire (dérivée de son code).
+Color couleurLabo(String code) => _tons[_empreinte(code) % _tons.length];
+
+/// « Laboratoire d'électronique » → « Électronique » (nom court des cartes et des puces).
+String nomCourtLabo(String nom) {
+  final court = nom.replaceFirst(RegExp(r"^Laboratoire (d'|de |des |du )?", caseSensitive: false), '').trim();
+  if (court.isEmpty) {
+    return nom;
+  }
+  return court[0].toUpperCase() + court.substring(1);
 }

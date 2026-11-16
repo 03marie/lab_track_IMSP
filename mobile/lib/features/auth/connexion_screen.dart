@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/api/client.dart';
 import '../../core/api/preferences.dart';
 import '../../core/theme/palette.dart';
-import '../../core/widgets/aurora.dart';
 import '../../core/widgets/composants.dart';
 import '../../core/widgets/logo.dart';
 import 'auth_controller.dart';
@@ -65,7 +64,8 @@ class _ConnexionScreenState extends ConsumerState<ConnexionScreen> {
 
     return Scaffold(
       resizeToAvoidBottomInset: true,
-      body: AuroraBackground(
+      body: ColoredBox(
+        color: context.lab.background,
         child: SafeArea(
           child: Center(
             child: SingleChildScrollView(
@@ -94,7 +94,7 @@ class _ConnexionScreenState extends ConsumerState<ConnexionScreen> {
                     const SizedBox(height: 36),
                     Entree(
                       index: 2,
-                      child: GlassCard(
+                      child: SurfaceCard(
                         padding: const EdgeInsets.fromLTRB(22, 26, 22, 22),
                         child: Form(
                           key: _formulaire,
@@ -176,7 +176,7 @@ class _ConnexionScreenState extends ConsumerState<ConnexionScreen> {
                                         ),
                                       ),
                               ),
-                              GradientButton(
+                              BoutonPrincipal(
                                 label: 'Se connecter',
                                 icone: Icons.arrow_forward_rounded,
                                 chargement: _chargement,
@@ -196,9 +196,9 @@ class _ConnexionScreenState extends ConsumerState<ConnexionScreen> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                             decoration: BoxDecoration(
-                              color: lab.glass,
+                              color: lab.surface,
                               borderRadius: BorderRadius.circular(99),
-                              border: Border.all(color: lab.glassBorder),
+                              border: Border.all(color: lab.border),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -208,13 +208,7 @@ class _ConnexionScreenState extends ConsumerState<ConnexionScreen> {
                                   height: 8,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: serveur.isEmpty ? Palette.gold : Palette.emerald,
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: (serveur.isEmpty ? Palette.gold : Palette.emerald).withValues(alpha: .8),
-                                        blurRadius: 8,
-                                      ),
-                                    ],
+                                    color: serveur.isEmpty ? Palette.ochre : Palette.emerald,
                                   ),
                                 ),
                                 const SizedBox(width: 10),
@@ -254,14 +248,15 @@ class DemarrageScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: AuroraBackground(
+      body: ColoredBox(
+        color: context.lab.background,
         child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               const LogoLabTrack(taille: 96),
               const SizedBox(height: 24),
-              GradientText('LabTrack', style: context.text.headlineMedium),
+              Text('LabTrack', style: context.text.headlineMedium),
             ],
           ),
         ),

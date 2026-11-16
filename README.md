@@ -46,9 +46,14 @@ flutter pub get
 flutter run                      # téléphone Android branché en USB (débogage USB activé)
 flutter build apk --release --target-platform android-arm64   # APK de production (~27 Mo, arm64) :
                                  # build/app/outputs/flutter-apk/app-release.apk
-flutter test                     # tests
+flutter test                     # tests (dont les garde-fous d'affichage)
 flutter test --update-goldens apercus/   # captures d'écran de revue → apercus/captures/
 ```
+
+**Mettre à jour sans désinstaller** : le numéro de version (`versionCode`) est calculé automatiquement à chaque build
+et l'APK est toujours signée avec la même clé (`~/.android/debug.keystore` sur le PC de build) : il suffit d'installer
+la nouvelle APK par-dessus l'ancienne, les réglages et la session sont conservés. **Sauvegardez ce fichier de clé** :
+sans lui, une APK compilée ailleurs ne pourra pas remplacer l'ancienne (désinstallation obligatoire).
 
 Au premier lancement, toucher la pastille « Configurer le serveur » sous le formulaire et saisir
 l'IP du PC (ex. `192.168.1.20:8000`), puis « Tester ».
@@ -64,6 +69,9 @@ l'IP du PC (ex. `192.168.1.20:8000`), puis « Tester ».
 | GET | `equipements/<id>/code-barres/` | Image PNG du code-barres |
 | GET | `equipements/etiquettes/?ids=1,2` ou `?laboratoire=1` | Planche d'étiquettes PDF |
 | GET | `equipements/<id>/historique/` | Journal de l'équipement |
+| DELETE | `equipements/<id>/` | Suppression définitive (409 si l'équipement a servi : utiliser `retirer`) |
+| DELETE | `laboratoires/<id>/` | Suppression d'un laboratoire vide (admin ; 409 s'il contient des équipements) |
+| PATCH / DELETE | `auth/moi/`, `auth/moi/photo/` | Modifier ses coordonnées / sa photo de profil |
 | GET | `equipements/statistiques/` | Compteurs par statut (filtrable par laboratoire) |
 | POST | `equipements/<id>/retirer/` | Retire du parc (motif obligatoire) |
 | GET/POST/PATCH | `utilisateurs/`, `laboratoires/`, `categories/` | Référentiels |

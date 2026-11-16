@@ -1,9 +1,9 @@
-from django.db.models import Count
+from django.db.models import Count, ProtectedError
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.exceptions import APIException, PermissionDenied, ValidationError
 from rest_framework.response import Response
 
 from apps.comptes.permissions import LectureSeulePourPersonnelEcritureGestionnaire
@@ -18,12 +18,22 @@ from .serializers import (
 )
 
 
+class Conflit(APIException):
+    """409 : l'action est refusée à cause de l'état actuel des données (historique, contenu…)."""
+
+    status_code = status.HTTP_409_CONFLICT
+    default_detail = "Cette action est impossible dans l'état actuel."
+    default_code = "conflit"
+
+
 class LaboratoireViewSet(viewsets.ModelViewSet):
+    """Laboratoires. Création, modification et suppression réservées à l'administrateur."""
+
     queryset = Laboratoire.objects.prefetch_related("equipements")
     serializer_class = LaboratoireSerializer
     permission_classes = [LectureSeulePourPersonnelEcritureGestionnaire]
     search_fields = ["code", "nom"]
-    http_method_names = ["get", "post", "patch", "head", "options"]
+    http_method_names = ["get", "post", "patch", "delete", "head", "options"]
 
     def _reserver_admin(self):
         if not self.request.user.est_admin:
@@ -36,6 +46,19 @@ class LaboratoireViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         self._reserver_admin()
         serializer.save()
+
+    def destroy(self, request, *args, **kwargs):
+        self._reserver_admin()
+        labo = self.get_object()
+        total = labo.equipements.count()
+        if total:
+            retires = labo.equipements.filter(statut=Equipement.Statut.RETIRE).count()
+            detail = f"Ce laboratoire contient encore {total} équipement{'s' if total > 1 else ''}"
+            if retires:
+                detail += f" (dont {retires} retiré{'s' if retires > 1 else ''} du parc)"
+            raise Conflit(detail + ". Supprimez ou déplacez-les avant de supprimer le laboratoire.")
+        labo.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class CategorieViewSet(viewsets.ModelViewSet):
@@ -51,7 +74,8 @@ class EquipementViewSet(viewsets.ModelViewSet):
 
     Lecture : tout le personnel (un retour peut concerner un autre laboratoire).
     Écriture : admin, ou responsable pour les équipements de ses laboratoires.
-    Pas de suppression : un équipement est *retiré* pour conserver son historique.
+    Suppression définitive : seulement si l'équipement n'a jamais servi (créé par erreur).
+    Sinon il est *retiré* du parc : il disparaît des listes mais son historique est conservé.
     """
 
     queryset = Equipement.objects.select_related("categorie", "laboratoire")
@@ -60,7 +84,17 @@ class EquipementViewSet(viewsets.ModelViewSet):
     filterset_fields = ["laboratoire", "categorie", "statut", "etat"]
     search_fields = ["code", "nom", "marque", "modele", "numero_serie", "emplacement"]
     ordering_fields = ["code", "nom", "cree_le"]
-    http_method_names = ["get", "post", "patch", "head", "options"]
+    http_method_names = ["get", "post", "patch", "delete", "head", "options"]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        # Les équipements retirés du parc n'apparaissent que si on les demande (?statut=retire),
+        # ou quand on consulte directement une fiche.
+        params = self.request.query_params
+        liste = self.action == "list" or (self.action == "etiquettes" and "ids" not in params)
+        if liste and "statut" not in params:
+            queryset = queryset.exclude(statut=Equipement.Statut.RETIRE)
+        return queryset
 
     # --- Contrôle d'accès par laboratoire -------------------------------------
     def _verifier_laboratoire(self, laboratoire):
@@ -90,6 +124,24 @@ class EquipementViewSet(viewsets.ModelViewSet):
             enregistrer_mouvement(equipement, Mouvement.Type.MODIFICATION, self.request.user,
                                   "Champs modifiés : " + ", ".join(sorted(champs_modifies)))
 
+    def destroy(self, request, *args, **kwargs):
+        """Suppression définitive d'un équipement qui n'a jamais servi."""
+        equipement = self.get_object()
+        self._verifier_laboratoire(equipement.laboratoire)
+        a_servi = equipement.mouvements.exclude(
+            type__in=[Mouvement.Type.CREATION, Mouvement.Type.MODIFICATION]
+        ).exists()
+        if equipement.statut != Equipement.Statut.DISPONIBLE or a_servi:
+            raise Conflit(
+                "Cet équipement a un historique (emprunt, panne, inventaire ou retrait) : il ne peut pas "
+                "être supprimé définitivement. Retirez-le du parc pour le masquer en gardant sa traçabilité."
+            )
+        try:
+            equipement.delete()
+        except ProtectedError:
+            raise Conflit("Cet équipement est référencé par d'autres enregistrements : retirez-le du parc.")
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
     # --- Recherche par scan ---------------------------------------------------
     @action(detail=False, methods=["get"], url_path=r"par-code/(?P<code>[^/]+)")
     def par_code(self, request, code=None):
@@ -111,7 +163,9 @@ class EquipementViewSet(viewsets.ModelViewSet):
         lignes = self.filter_queryset(self.get_queryset()).order_by().values("statut").annotate(n=Count("id"))
         for ligne in lignes:
             par_statut[ligne["statut"]] = ligne["n"]
-        return Response({"total": sum(par_statut.values()), "par_statut": par_statut})
+        # `total` = parc en service : les équipements retirés sont comptés à part (par_statut.retire).
+        en_service = sum(n for statut, n in par_statut.items() if statut != Equipement.Statut.RETIRE)
+        return Response({"total": en_service, "par_statut": par_statut})
 
     # --- Historique et étiquettes --------------------------------------------
     @action(detail=True, methods=["get"])

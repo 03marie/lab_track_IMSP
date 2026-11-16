@@ -4,11 +4,19 @@ from .models import Categorie, Equipement, Laboratoire, Mouvement
 
 
 class LaboratoireSerializer(serializers.ModelSerializer):
-    nb_equipements = serializers.IntegerField(source="equipements.count", read_only=True)
+    # Équipements en service (les équipements retirés du parc ne sont pas comptés).
+    nb_equipements = serializers.SerializerMethodField()
 
     class Meta:
         model = Laboratoire
         fields = ["id", "code", "nom", "localisation", "responsables", "nb_equipements"]
+
+    def get_nb_equipements(self, obj) -> int:
+        # `equipements` est préchargé par la vue : pas de requête supplémentaire par laboratoire.
+        return sum(1 for e in obj.equipements.all() if e.statut != Equipement.Statut.RETIRE)
+
+    def validate_code(self, valeur):
+        return valeur.strip().upper()
 
 
 class CategorieSerializer(serializers.ModelSerializer):

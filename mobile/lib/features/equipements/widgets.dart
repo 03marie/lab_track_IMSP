@@ -11,9 +11,9 @@ import '../../core/widgets/composants.dart';
 /// Style des codes `IMSP-EQ-0001` : police de l'app, chiffres à chasse fixe (alignés d'une ligne à l'autre).
 const styleCode = TextStyle(
   fontFamily: 'Jakarta',
-  fontWeight: FontWeight.w700,
+  fontWeight: FontWeight.w600,
   fontSize: 12.5,
-  letterSpacing: .8,
+  letterSpacing: .5,
   fontFeatures: [FontFeature.tabularFigures()],
 );
 
@@ -29,42 +29,34 @@ class EquipementTile extends StatelessWidget {
     final visuel = visuelCategorie(e.categorieNom);
     final lieu = [e.laboratoireNom, e.emplacement].where((s) => s.isNotEmpty).join(' · ');
     return SurfaceCard(
-      padding: const EdgeInsets.all(14),
+      accent: visuel.couleur,
+      padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
       onTap: () => context.push('/equipement/${e.id}'),
       child: Row(
         children: [
           Hero(
             tag: 'equipement-${e.id}',
-            child: GradientIcon(icone: visuel.icone, teintes: visuel.teintes),
+            child: IconeTuile(icone: visuel.icone, couleur: visuel.couleur),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(e.nom, maxLines: 1, overflow: TextOverflow.ellipsis, style: context.text.titleMedium),
-                    ),
-                    Icon(Icons.chevron_right_rounded, size: 20, color: lab.textMuted.withValues(alpha: .6)),
-                  ],
-                ),
-                if (lieu.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(lieu, maxLines: 1, overflow: TextOverflow.ellipsis, style: context.text.bodySmall),
-                ],
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Text(e.code, style: styleCode.copyWith(color: Palette.violet)),
-                    const Spacer(),
-                    StatusPill.statut(e.statut, compact: true),
-                  ],
+                Text(e.nom, maxLines: 1, overflow: TextOverflow.ellipsis, style: context.text.titleSmall),
+                const SizedBox(height: 2),
+                Text(
+                  lieu.isEmpty ? e.code : '${e.code} · $lieu',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: context.text.bodySmall,
                 ),
               ],
             ),
           ),
+          const SizedBox(width: 8),
+          StatusPill.statut(e.statut, compact: true),
+          Icon(Icons.chevron_right_rounded, color: lab.textMuted),
         ],
       ),
     );
@@ -76,35 +68,75 @@ class EquipementTileSkeleton extends StatelessWidget {
   const EquipementTileSkeleton({super.key});
 
   @override
+  Widget build(BuildContext context) => const Skeleton(height: 68, radius: 16);
+}
+
+/// Petite carte d'équipement (grille à deux colonnes). Le filet de couleur indique la catégorie.
+class EquipementCard extends StatelessWidget {
+  const EquipementCard(this.e, {super.key});
+
+  final Equipement e;
+
+  @override
   Widget build(BuildContext context) {
+    final visuel = visuelCategorie(e.categorieNom);
+    final statut = apparenceStatut(e.statut);
+    final lieu = e.emplacement.isNotEmpty ? e.emplacement : e.laboratoireNom;
+
     return SurfaceCard(
-      padding: const EdgeInsets.all(14),
-      child: Row(
+      accent: visuel.couleur,
+      padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+      onTap: () => context.push('/equipement/${e.id}'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Skeleton(width: 52, height: 52, radius: 16),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Skeleton(height: 14, width: 160),
-                SizedBox(height: 8),
-                Skeleton(height: 11, width: 100),
-                SizedBox(height: 8),
-                Skeleton(height: 11, width: 130),
-              ],
-            ),
+          Row(
+            children: [
+              Hero(
+                tag: 'equipement-${e.id}',
+                child: IconeTuile(icone: visuel.icone, couleur: visuel.couleur, taille: 40),
+              ),
+              const Spacer(),
+              Icon(statut.icone, size: 20, color: statut.couleur),
+            ],
           ),
-          const Skeleton(width: 74, height: 22, radius: 99),
+          const Spacer(),
+          Text(e.nom, maxLines: 2, overflow: TextOverflow.ellipsis, style: context.text.titleSmall?.copyWith(height: 1.2)),
+          const SizedBox(height: 2),
+          Text(lieu, maxLines: 1, overflow: TextOverflow.ellipsis, style: context.text.bodySmall?.copyWith(fontSize: 11.5)),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Text(e.code.replaceFirst('IMSP-EQ-', '#'), style: styleCode.copyWith(fontSize: 11.5, color: context.lab.textMuted)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  statut.libelle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.end,
+                  style: TextStyle(color: context.lisible(statut.couleur), fontWeight: FontWeight.w600, fontSize: 11.5),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 }
 
-/// Anneau des statuts : un arc par statut, animé à l'apparition.
+/// Squelette d'une carte pendant le chargement.
+class EquipementCardSkeleton extends StatelessWidget {
+  const EquipementCardSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) => const Skeleton(height: double.infinity, radius: 16);
+}
+
+/// Anneau des statuts : un arc par statut.
 class AnneauStatuts extends StatelessWidget {
-  const AnneauStatuts({super.key, required this.stats, this.taille = 120, this.epaisseur = 12, this.centre});
+  const AnneauStatuts({super.key, required this.stats, this.taille = 104, this.epaisseur = 10, this.centre});
 
   final Statistiques stats;
   final double taille;
@@ -119,11 +151,11 @@ class AnneauStatuts extends StatelessWidget {
     ];
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0, end: 1),
-      duration: const Duration(milliseconds: 1400),
-      curve: Curves.easeOutQuart,
+      duration: const Duration(milliseconds: 900),
+      curve: Curves.easeOutCubic,
       builder: (context, t, child) => CustomPaint(
         size: Size.square(taille),
-        painter: _AnneauPainter(segments, t, epaisseur),
+        painter: _AnneauPainter(segments, t, epaisseur, context.lab.border),
         child: SizedBox.square(
           dimension: taille,
           child: Center(child: child),
@@ -135,39 +167,49 @@ class AnneauStatuts extends StatelessWidget {
 }
 
 class _AnneauPainter extends CustomPainter {
-  _AnneauPainter(this.segments, this.progression, this.epaisseur);
+  _AnneauPainter(this.segments, this.progression, this.epaisseur, this.fond);
 
   final List<(double, Color)> segments;
   final double progression;
   final double epaisseur;
+  final Color fond;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-    final zone = rect.deflate(epaisseur / 2);
-    final fond = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = epaisseur
-      ..color = Colors.white.withValues(alpha: .14);
-    canvas.drawArc(zone, 0, 2 * math.pi, false, fond);
+    final zone = (Offset.zero & size).deflate(epaisseur / 2);
+    canvas.drawArc(
+      zone,
+      0,
+      2 * math.pi,
+      false,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = epaisseur
+        ..color = fond,
+    );
 
     final total = segments.fold<double>(0, (a, s) => a + s.$1);
     if (total == 0) return;
-    const ecart = .07;
+    const ecart = .06;
     var depart = -math.pi / 2;
     for (final (valeur, couleur) in segments) {
       final balayage = 2 * math.pi * valeur / total;
       final visible = math.max(0.0, (balayage - (segments.length > 1 ? ecart : 0)) * progression);
-      final p = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = epaisseur
-        ..strokeCap = StrokeCap.round
-        ..color = couleur;
-      canvas.drawArc(zone, depart + ecart / 2, visible, false, p);
+      canvas.drawArc(
+        zone,
+        depart + ecart / 2,
+        visible,
+        false,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = epaisseur
+          ..strokeCap = StrokeCap.butt
+          ..color = couleur,
+      );
       depart += balayage;
     }
   }
 
   @override
-  bool shouldRepaint(_AnneauPainter old) => old.progression != progression || old.segments != segments;
+  bool shouldRepaint(_AnneauPainter old) => old.progression != progression || old.segments != segments || old.fond != fond;
 }

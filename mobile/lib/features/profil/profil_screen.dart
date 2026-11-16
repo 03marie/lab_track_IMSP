@@ -1,15 +1,23 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../core/api/client.dart';
+import '../../core/api/modeles.dart';
 import '../../core/api/preferences.dart';
 import '../../core/theme/palette.dart';
-import '../../core/widgets/aurora.dart';
+import '../../core/theme/semantique.dart';
+import '../../core/widgets/avatar.dart';
 import '../../core/widgets/composants.dart';
+import '../../core/widgets/dialogues.dart';
+import '../equipements/equipements_repository.dart';
 import '../auth/auth_controller.dart';
 import '../auth/serveur_sheet.dart';
+import '../../core/widgets/feuille.dart';
 
 class ProfilScreen extends ConsumerWidget {
   const ProfilScreen({super.key});
@@ -48,53 +56,17 @@ class ProfilScreen extends ConsumerWidget {
     final lab = context.lab;
 
     return Scaffold(
-      body: AuroraBackground(
-        intensite: .5,
+      body: ColoredBox(
+        color: lab.background,
         child: ListView(
           physics: const BouncingScrollPhysics(),
-          padding: EdgeInsets.fromLTRB(20, MediaQuery.paddingOf(context).top + 24, 20, 140),
+          padding: EdgeInsets.fromLTRB(20, MediaQuery.paddingOf(context).top + 24, 20, MediaQuery.paddingOf(context).bottom + 24),
           children: [
-            Entree(
-              child: Column(
-                children: [
-                  Container(
-                    width: 112,
-                    height: 112,
-                    padding: const EdgeInsets.all(3.5),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: Palette.signatureSoft,
-                      boxShadow: [BoxShadow(color: Palette.iris.withValues(alpha: .5), blurRadius: 36, spreadRadius: -6)],
-                    ),
-                    child: Container(
-                      decoration: BoxDecoration(shape: BoxShape.circle, color: lab.surface),
-                      alignment: Alignment.center,
-                      child: GradientText(u?.initiales ?? '?', style: const TextStyle(fontSize: 38, fontWeight: FontWeight.w800)),
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  Text(u?.nomComplet ?? '', style: context.text.headlineSmall, textAlign: TextAlign.center),
-                  const SizedBox(height: 8),
-                  if (u != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                      decoration: BoxDecoration(
-                        color: context.or.withValues(alpha: .12),
-                        borderRadius: BorderRadius.circular(99),
-                        border: Border.all(color: context.or.withValues(alpha: .35)),
-                      ),
-                      child: Text(
-                        u.roleLibelle,
-                        style: TextStyle(color: context.or, fontWeight: FontWeight.w700, fontSize: 13),
-                      ),
-                    ),
-                  const SizedBox(height: 6),
-                  Text('@${u?.username ?? ''}', style: context.text.bodySmall),
-                ],
-              ),
-            ),
-            const SizedBox(height: 32),
-            const Entree(index: 1, child: TitreSection('Apparence')),
+            Entree(child: _EnTeteProfil(u: u)),
+            const SizedBox(height: 26),
+            Entree(index: 1, child: _InfosProfil(u: u)),
+            const SizedBox(height: 30),
+            const Entree(index: 2, child: TitreSection('Apparence')),
             const SizedBox(height: 12),
             Entree(
               index: 2,
@@ -117,7 +89,7 @@ class ProfilScreen extends ConsumerWidget {
                   children: [
                     _Ligne(
                       icone: Icons.dns_rounded,
-                      couleur: Palette.aqua,
+                      couleur: Palette.teal,
                       titre: 'Serveur',
                       sousTitre: serveur.replaceFirst(RegExp(r'^https?://'), ''),
                       onTap: () => _changerServeur(context, ref),
@@ -125,16 +97,21 @@ class ProfilScreen extends ConsumerWidget {
                     Divider(indent: 70, color: lab.border),
                     _Ligne(
                       icone: Icons.key_rounded,
-                      couleur: Palette.violet,
+                      couleur: context.accent,
                       titre: 'Changer le mot de passe',
-                      onTap: () => showModalBottomSheet<void>(
+                      onTap: () => ouvrirFeuille<void>(
                         context: context,
                         isScrollControlled: true,
                         builder: (_) => const _MotDePasseSheet(),
                       ),
                     ),
                     Divider(indent: 70, color: lab.border),
-                    _Ligne(icone: Icons.info_rounded, couleur: context.or, titre: 'LabTrack', sousTitre: 'Version 1.0 · IMSP'),
+                    _Ligne(
+                      icone: Icons.info_rounded,
+                      couleur: context.accent,
+                      titre: 'LabTrack',
+                      sousTitre: 'Version 1.2 · IMSP',
+                    ),
                   ],
                 ),
               ),
@@ -210,11 +187,7 @@ class _SelecteurTheme extends StatelessWidget {
                 bottom: 0,
                 width: largeur,
                 child: Container(
-                  decoration: BoxDecoration(
-                    gradient: Palette.signatureSoft,
-                    borderRadius: BorderRadius.circular(15),
-                    boxShadow: [BoxShadow(color: Palette.iris.withValues(alpha: .4), blurRadius: 14, offset: const Offset(0, 4))],
-                  ),
+                  decoration: BoxDecoration(color: Palette.accent, borderRadius: BorderRadius.circular(11)),
                 ),
               ),
               Positioned.fill(
@@ -364,8 +337,415 @@ class _MotDePasseSheetState extends ConsumerState<_MotDePasseSheet> {
           ),
         ],
         const SizedBox(height: 22),
-        GradientButton(label: 'Enregistrer', icone: Icons.check_rounded, chargement: _chargement, onPressed: _valider),
+        BoutonPrincipal(label: 'Enregistrer', icone: Icons.check_rounded, chargement: _chargement, onPressed: _valider),
       ],
+    ),
+  );
+}
+
+// --- En-tête : photo de profil -------------------------------------------------
+
+class _EnTeteProfil extends ConsumerStatefulWidget {
+  const _EnTeteProfil({required this.u});
+  final Utilisateur? u;
+
+  @override
+  ConsumerState<_EnTeteProfil> createState() => _EnTeteProfilState();
+}
+
+class _EnTeteProfilState extends ConsumerState<_EnTeteProfil> {
+  bool _envoi = false;
+
+  Future<void> _changerPhoto() async {
+    final u = widget.u;
+    final choix = await ouvrirFeuille<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Photo de profil', style: context.text.titleLarge),
+              const SizedBox(height: 8),
+              _OptionPhoto(
+                icone: Icons.photo_camera_rounded,
+                couleur: context.accent,
+                titre: 'Prendre une photo',
+                valeur: 'camera',
+              ),
+              _OptionPhoto(
+                icone: Icons.photo_library_rounded,
+                couleur: Palette.teal,
+                titre: 'Choisir dans la galerie',
+                valeur: 'galerie',
+              ),
+              if (u?.photo != null)
+                _OptionPhoto(
+                  icone: Icons.delete_outline_rounded,
+                  couleur: Palette.rose,
+                  titre: 'Supprimer ma photo',
+                  valeur: 'supprimer',
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (choix == null || !mounted) return;
+    final auth = ref.read(authProvider.notifier);
+
+    setState(() => _envoi = true);
+    try {
+      if (choix == 'supprimer') {
+        await auth.supprimerPhoto();
+        if (mounted) notifier(context, 'Photo de profil supprimée');
+      } else {
+        final fichier = await ImagePicker().pickImage(
+          source: choix == 'camera' ? ImageSource.camera : ImageSource.gallery,
+          maxWidth: 900,
+          imageQuality: 85,
+          preferredCameraDevice: CameraDevice.front,
+        );
+        if (fichier == null) return;
+        await auth.modifierProfil(photo: File(fichier.path));
+        HapticFeedback.mediumImpact();
+        if (mounted) notifier(context, 'Photo de profil mise à jour');
+      }
+    } on DioException catch (e) {
+      if (mounted) notifier(context, messageErreur(e), erreur: true);
+    } on PlatformException {
+      if (mounted) {
+        notifier(context, 'Impossible d\'accéder à la caméra ou à la galerie. Vérifiez les autorisations.', erreur: true);
+      }
+    } finally {
+      if (mounted) setState(() => _envoi = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final u = widget.u;
+    final lab = context.lab;
+    return Column(
+      children: [
+        Pressable(
+          onTap: _envoi ? null : _changerPhoto,
+          child: SizedBox(
+            width: 136,
+            height: 136,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                AvatarUtilisateur(u, taille: 120),
+                if (_envoi)
+                  Positioned.fill(
+                    child: Padding(
+                      padding: const EdgeInsets.all(4),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.black.withValues(alpha: .5)),
+                        child: const Center(
+                          child: SizedBox(
+                            width: 30,
+                            height: 30,
+                            child: CircularProgressIndicator(strokeWidth: 3, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                Positioned(
+                  right: 0,
+                  bottom: 4,
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Palette.accent,
+                      border: Border.all(color: lab.background, width: 3),
+                    ),
+                    child: const Icon(Icons.photo_camera_rounded, color: Colors.white, size: 21),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(u?.nomComplet ?? '', style: context.text.headlineSmall, textAlign: TextAlign.center),
+        const SizedBox(height: 8),
+        if (u != null)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+            decoration: BoxDecoration(
+              color: context.accent.withValues(alpha: .14),
+              borderRadius: BorderRadius.circular(99),
+              border: Border.all(color: context.accent.withValues(alpha: .4)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.workspace_premium_rounded, size: 16, color: context.accent),
+                const SizedBox(width: 6),
+                Text(
+                  u.roleLibelle,
+                  style: TextStyle(color: context.accent, fontWeight: FontWeight.w700, fontSize: 13),
+                ),
+              ],
+            ),
+          ),
+        const SizedBox(height: 6),
+        Text('Touchez la photo pour la changer', style: context.text.bodySmall?.copyWith(fontSize: 11.5)),
+      ],
+    );
+  }
+}
+
+class _OptionPhoto extends StatelessWidget {
+  const _OptionPhoto({required this.icone, required this.couleur, required this.titre, required this.valeur});
+  final IconData icone;
+  final Color couleur;
+  final String titre;
+  final String valeur;
+
+  @override
+  Widget build(BuildContext context) => ListTile(
+    onTap: () => Navigator.pop(context, valeur),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+    leading: Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(color: couleur.withValues(alpha: .14), borderRadius: BorderRadius.circular(14)),
+      child: Icon(icone, color: couleur),
+    ),
+    title: Text(titre, style: const TextStyle(fontWeight: FontWeight.w700)),
+  );
+}
+
+// --- Informations du compte ----------------------------------------------------
+
+class _InfosProfil extends ConsumerWidget {
+  const _InfosProfil({required this.u});
+  final Utilisateur? u;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = u;
+    if (user == null) return const SizedBox.shrink();
+    final labos = ref.watch(laboratoiresProvider).value ?? const <Laboratoire>[];
+    final geres = labos.where((l) => user.laboratoiresGeres.contains(l.id)).toList();
+
+    final lignes = <(IconData, Color, String, String)>[
+      (Icons.alternate_email_rounded, context.accent, 'Identifiant', user.username),
+      (Icons.mail_rounded, Palette.teal, 'E-mail', user.email),
+      (Icons.phone_rounded, Palette.emerald, 'Téléphone', user.telephone),
+      (Icons.badge_rounded, Palette.amber, 'Matricule', user.matricule),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            const Expanded(child: TitreSection('Mes informations')),
+            Pressable(
+              onTap: () => ouvrirFeuille<void>(
+                context: context,
+                isScrollControlled: true,
+                builder: (_) => _CoordonneesSheet(u: user),
+              ),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                decoration: BoxDecoration(
+                  color: context.accent.withValues(alpha: .16),
+                  borderRadius: BorderRadius.circular(99),
+                  border: Border.all(color: context.accent.withValues(alpha: .4)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.edit_rounded, size: 15, color: context.accent),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Modifier',
+                      style: TextStyle(color: context.accent, fontWeight: FontWeight.w600, fontSize: 12.5),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        SurfaceCard(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          child: Column(
+            children: [
+              for (final (i, (icone, couleur, libelle, valeur)) in lignes.indexed) ...[
+                if (i > 0) Divider(color: context.lab.border),
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 11),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(color: couleur.withValues(alpha: .15), borderRadius: BorderRadius.circular(12)),
+                        child: Icon(icone, color: couleur, size: 20),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(libelle, style: context.text.bodySmall),
+                            const SizedBox(height: 1),
+                            Text(
+                              valeur.isEmpty ? 'Non renseigné' : valeur,
+                              style: context.text.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: valeur.isEmpty ? context.lab.textMuted : context.lab.text,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        if (user.role == 'admin' || geres.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          SurfaceCard(
+            accent: Palette.teal,
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.science_rounded, color: Palette.teal, size: 20),
+                    const SizedBox(width: 10),
+                    Text('Laboratoires gérés', style: context.text.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (user.role == 'admin')
+                  Text(
+                    'Administrateur : accès à tous les laboratoires.',
+                    style: context.text.bodyMedium?.copyWith(color: context.lab.textMuted),
+                  )
+                else
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final l in geres)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                          decoration: BoxDecoration(color: couleurLabo(l.code), borderRadius: BorderRadius.circular(99)),
+                          child: Text(
+                            l.nom,
+                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12.5),
+                          ),
+                        ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _CoordonneesSheet extends ConsumerStatefulWidget {
+  const _CoordonneesSheet({required this.u});
+  final Utilisateur u;
+
+  @override
+  ConsumerState<_CoordonneesSheet> createState() => _CoordonneesSheetState();
+}
+
+class _CoordonneesSheetState extends ConsumerState<_CoordonneesSheet> {
+  final _cle = GlobalKey<FormState>();
+  late final _email = TextEditingController(text: widget.u.email);
+  late final _telephone = TextEditingController(text: widget.u.telephone);
+  bool _chargement = false;
+  String? _erreur;
+
+  @override
+  void dispose() {
+    _email.dispose();
+    _telephone.dispose();
+    super.dispose();
+  }
+
+  Future<void> _enregistrer() async {
+    if (!_cle.currentState!.validate()) return;
+    setState(() {
+      _chargement = true;
+      _erreur = null;
+    });
+    try {
+      await ref.read(authProvider.notifier).modifierProfil(email: _email.text, telephone: _telephone.text);
+      if (!mounted) return;
+      Navigator.pop(context);
+      notifier(context, 'Informations enregistrées');
+    } on DioException catch (e) {
+      if (mounted) setState(() => _erreur = messageErreur(e));
+    } finally {
+      if (mounted) setState(() => _chargement = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: EdgeInsets.fromLTRB(24, 0, 24, MediaQuery.viewInsetsOf(context).bottom + 28),
+    child: Form(
+      key: _cle,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Mes coordonnées', style: context.text.titleLarge),
+          const SizedBox(height: 4),
+          Text('Le nom, le rôle et l\'identifiant sont gérés par l\'administration.', style: context.text.bodySmall),
+          const SizedBox(height: 20),
+          TextFormField(
+            controller: _email,
+            keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.next,
+            autocorrect: false,
+            validator: (v) {
+              final t = (v ?? '').trim();
+              return t.isEmpty || RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(t) ? null : 'Adresse e-mail invalide';
+            },
+            decoration: const InputDecoration(labelText: 'E-mail', prefixIcon: Icon(Icons.mail_rounded)),
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _telephone,
+            keyboardType: TextInputType.phone,
+            onFieldSubmitted: (_) => _enregistrer(),
+            decoration: const InputDecoration(labelText: 'Téléphone', prefixIcon: Icon(Icons.phone_rounded)),
+          ),
+          if (_erreur != null) ...[
+            const SizedBox(height: 12),
+            Text(
+              _erreur!,
+              style: const TextStyle(color: Palette.rose, fontWeight: FontWeight.w600),
+            ),
+          ],
+          const SizedBox(height: 22),
+          BoutonPrincipal(label: 'Enregistrer', icone: Icons.check_rounded, chargement: _chargement, onPressed: _enregistrer),
+        ],
+      ),
     ),
   );
 }

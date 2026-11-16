@@ -6,10 +6,11 @@ import '../../core/api/preferences.dart';
 import '../../core/theme/palette.dart';
 import '../../core/widgets/composants.dart';
 import 'auth_controller.dart';
+import '../../core/widgets/feuille.dart';
 
 /// Ouvre la feuille de configuration du serveur. Retourne `true` si l'adresse a changé.
 Future<bool?> ouvrirConfigurationServeur(BuildContext context) =>
-    showModalBottomSheet<bool>(context: context, isScrollControlled: true, builder: (_) => const _ServeurSheet());
+    ouvrirFeuille<bool>(context: context, isScrollControlled: true, builder: (_) => const _ServeurSheet());
 
 enum _Test { aucun, encours, ok, echec }
 
@@ -81,7 +82,7 @@ class _ServeurSheetState extends ConsumerState<_ServeurSheet> {
         children: [
           Row(
             children: [
-              const GradientIcon(icone: Icons.dns_rounded, teintes: [Palette.iris, Palette.aqua], taille: 48, rayon: 15),
+              const IconeTuile(icone: Icons.dns_rounded, couleur: Palette.accent, taille: 46),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -166,7 +167,7 @@ class _ServeurSheetState extends ConsumerState<_ServeurSheet> {
               const SizedBox(width: 12),
               Expanded(
                 flex: 2,
-                child: GradientButton(label: 'Enregistrer', icone: Icons.check_rounded, onPressed: _enregistrer),
+                child: BoutonPrincipal(label: 'Enregistrer', icone: Icons.check_rounded, onPressed: _enregistrer),
               ),
             ],
           ),

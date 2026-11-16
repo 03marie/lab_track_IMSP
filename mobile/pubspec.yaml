@@ -2,7 +2,7 @@ name: labtrack
 description: "LabTrack - gestion des équipements de laboratoire de l'IMSP"
 publish_to: 'none'
 
-version: 1.0.0+1
+version: 1.2.0+3
 
 environment:
   sdk: ^3.13.7
@@ -20,6 +20,9 @@ dependencies:
   shared_preferences: ^2.5.6   # préférences (adresse du serveur, thème)
   mobile_scanner: ^7.5.0       # scan Code 128 via la caméra (ML Kit)
   intl: ^0.20.3                # dates en français
+  printing: ^5.15.1
+  image_picker: ^1.2.4
+  pdf: ^3.13.1
 
 dev_dependencies:
   flutter_test:

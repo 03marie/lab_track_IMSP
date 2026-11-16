@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
@@ -66,6 +67,117 @@ class EquipementsRepository {
     final r = await _dio.get<Map<String, dynamic>>('laboratoires/');
     return (r.data!['results'] as List).cast<Map<String, dynamic>>().map(Laboratoire.fromJson).toList();
   }
+
+  // --- Écriture --------------------------------------------------------------
+
+  Future<Laboratoire> creerLaboratoire({
+    required String code,
+    required String nom,
+    String localisation = '',
+    List<int> responsables = const [],
+  }) async {
+    final r = await _dio.post<Map<String, dynamic>>(
+      'laboratoires/',
+      data: {'code': code, 'nom': nom, 'localisation': localisation, 'responsables': responsables},
+    );
+    return Laboratoire.fromJson(r.data!);
+  }
+
+  /// Échoue avec un 409 (message du serveur) si le laboratoire contient encore des équipements.
+  Future<void> supprimerLaboratoire(int id) => _dio.delete<void>('laboratoires/$id/');
+
+  Future<List<Categorie>> categories() async {
+    final r = await _dio.get<Map<String, dynamic>>('categories/', queryParameters: {'page_size': 200});
+    return (r.data!['results'] as List).cast<Map<String, dynamic>>().map(Categorie.fromJson).toList();
+  }
+
+  Future<Categorie> creerCategorie(String nom) async {
+    final r = await _dio.post<Map<String, dynamic>>('categories/', data: {'nom': nom});
+    return Categorie.fromJson(r.data!);
+  }
+
+  /// Utilisateurs « responsable » (pour désigner les responsables d'un laboratoire).
+  Future<List<Utilisateur>> responsables() async {
+    final r = await _dio.get<Map<String, dynamic>>('utilisateurs/', queryParameters: {'role': 'responsable'});
+    return (r.data!['results'] as List).cast<Map<String, dynamic>>().map(Utilisateur.fromJson).toList();
+  }
+
+  Future<Equipement> creerEquipement(DonneesEquipement d) async {
+    final r = await _dio.post<Map<String, dynamic>>('equipements/', data: await d.versFormData());
+    return Equipement.fromJson(r.data!);
+  }
+
+  Future<Equipement> modifierEquipement(int id, DonneesEquipement d) async {
+    final r = await _dio.patch<Map<String, dynamic>>('equipements/$id/', data: await d.versFormData());
+    return Equipement.fromJson(r.data!);
+  }
+
+  /// Suppression définitive. Échoue avec un 409 si l'équipement a un historique : il faut alors le [retirer].
+  Future<void> supprimerEquipement(int id) => _dio.delete<void>('equipements/$id/');
+
+  Future<Equipement> retirer(int id, String motif) async {
+    final r = await _dio.post<Map<String, dynamic>>('equipements/$id/retirer/', data: {'motif': motif});
+    return Equipement.fromJson(r.data!);
+  }
+
+  /// Planche d'étiquettes A4 (PDF). `saut` = emplacements déjà utilisés sur une feuille entamée.
+  Future<Uint8List> pdfEtiquettes({List<int>? ids, int? laboratoire, int saut = 0}) async {
+    final r = await _dio.get<List<int>>(
+      'equipements/etiquettes/',
+      queryParameters: {if (ids != null) 'ids': ids.join(','), 'laboratoire': ?laboratoire, if (saut > 0) 'saut': saut},
+      options: Options(responseType: ResponseType.bytes, receiveTimeout: const Duration(seconds: 60)),
+    );
+    return Uint8List.fromList(r.data!);
+  }
+}
+
+/// Champs du formulaire d'équipement.
+class DonneesEquipement {
+  const DonneesEquipement({
+    required this.nom,
+    required this.categorie,
+    required this.laboratoire,
+    this.emplacement = '',
+    this.marque = '',
+    this.modele = '',
+    this.numeroSerie = '',
+    this.description = '',
+    this.dateAcquisition,
+    this.photo,
+  });
+
+  final String nom;
+  final int categorie;
+  final int laboratoire;
+  final String emplacement;
+  final String marque;
+  final String modele;
+  final String numeroSerie;
+  final String description;
+  final DateTime? dateAcquisition;
+
+  /// Fichier photo local à envoyer (null = ne pas toucher à la photo existante).
+  final File? photo;
+
+  Future<FormData> versFormData() async {
+    final date = dateAcquisition;
+    return FormData.fromMap({
+      'nom': nom.trim(),
+      'categorie': categorie,
+      'laboratoire': laboratoire,
+      'emplacement': emplacement.trim(),
+      'marque': marque.trim(),
+      'modele': modele.trim(),
+      'numero_serie': numeroSerie.trim(),
+      'description': description.trim(),
+      // Chaîne vide = « pas de date » (le serveur la lit comme null).
+      'date_acquisition': date == null
+          ? ''
+          : '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}',
+      if (photo != null)
+        'photo': await MultipartFile.fromFile(photo!.path, filename: 'photo_${DateTime.now().millisecondsSinceEpoch}.jpg'),
+    });
+  }
 }
 
 final equipementsRepositoryProvider = Provider((ref) => EquipementsRepository(ref.watch(dioProvider)));
@@ -106,3 +218,24 @@ final laboratoiresProvider = FutureProvider.autoDispose<List<Laboratoire>>(
 final codeBarresProvider = FutureProvider.autoDispose.family<Uint8List, int>(
   (ref, id) => ref.watch(equipementsRepositoryProvider).codeBarres(id),
 );
+
+final categoriesProvider = FutureProvider.autoDispose<List<Categorie>>(
+  (ref) => ref.watch(equipementsRepositoryProvider).categories(),
+);
+
+final responsablesProvider = FutureProvider.autoDispose<List<Utilisateur>>(
+  (ref) => ref.watch(equipementsRepositoryProvider).responsables(),
+);
+
+/// À appeler après toute création, modification, suppression ou retrait :
+/// les listes, compteurs et fiches se rechargent avec les données à jour.
+void rafraichirDonnees(WidgetRef ref) {
+  ref
+    ..invalidate(pageEquipementsProvider)
+    ..invalidate(equipementProvider)
+    ..invalidate(historiqueProvider)
+    ..invalidate(statistiquesProvider)
+    ..invalidate(recentsProvider)
+    ..invalidate(laboratoiresProvider)
+    ..invalidate(categoriesProvider);
+}
